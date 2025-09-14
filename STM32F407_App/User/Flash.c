@@ -25,7 +25,7 @@ uint8_t FLASH_ReadByte(uint32_t Address)
     return*((__IO uint8_t*)Address);
 }
 
-void FLASH_EraseAllPage(void)
+void MyFLASH_EraseAllSectors(void)
 {
     FLASH_Unlock();
 
@@ -35,7 +35,7 @@ void FLASH_EraseAllPage(void)
     FLASH_Lock();
 }
 
-void FLASH_ErasePage(uint32_t Sector)
+void MyFLASH_EraseSectors(uint32_t Sector)
 {
     FLASH_Unlock();
 
@@ -67,23 +67,65 @@ void FLASH_WriteHalfWord(uint32_t Address, uint16_t Data)
     FLASH_Lock();
 }
 
+FLASH_Status FLASH_Write_Buffer(uint32_t Address, uint16_t* pData, uint16_t Count)
+{
+    FLASH_Status flash_status = FLASH_COMPLETE;
+    uint16_t i = 0;
+
+    FLASH_Unlock();
+
+    for(i = 0; (i < Count) && (flash_status == FLASH_COMPLETE); i++)
+    {
+        // 在循环中，只执行写入操作
+        flash_status = FLASH_ProgramHalfWord(Address + i * 2, pData[i]);
+    }
+
+    FLASH_Lock();
+
+    return flash_status;
+}
+
 void FLASH_Store_Init(void)
 {
     uint16_t i;
 
-    if (FLASH_ReadHalfWord(STORE_START_ADDRESS) != 0xA5A5)
+    // 1. 先将Flash中的数据读入RAM
+    for (i = 0; i < STORE_COUNT; i ++)
     {
-        FLASH_ErasePage(FLASH_SECTOR_11);
-        FLASH_WriteHalfWord(STORE_START_ADDRESS, 0xA5A5);
-        for (i = 1; i < STORE_COUNT; i ++)
-		{
-			FLASH_WriteHalfWord(STORE_START_ADDRESS + i * 2, 0x0000);
-		}
+        Store_Data[i] = FLASH_ReadHalfWord(STORE_START_ADDRESS + i * 2);
     }
 
-    for (i = 0; i < STORE_COUNT; i ++)
+    // 2. 在RAM中检查标志位
+    if (Store_Data[0] != 0xA5A5)
+    {
+        // 3. 如果标志位不对，在RAM中准备好初始化数据
+        Store_Data[0] = 0xA5A5;
+        for (i = 1; i < STORE_COUNT; i ++)
+        {
+            Store_Data[i] = 0x0000;
+        }
+        
+        // 4. 一次性将准备好的数据写入Flash
+        FLASH_Store_Save();
+    }
+}
+
+void FLASH_Store_Save(void)
+{
+	MyFLASH_EraseSectors(FLASH_SECTOR_11);
+
+    FLASH_Write_Buffer(STORE_START_ADDRESS, Store_Data, STORE_COUNT);
+}
+
+void FLASH_Store_Clear(void)
+{
+    uint16_t i;
+
+	for (i = 1; i < STORE_COUNT; i ++)
 	{
-		Store_Data[i] = FLASH_ReadHalfWord(STORE_START_ADDRESS + i * 2);
+		Store_Data[i] = 0x0000;
 	}
+
+	FLASH_Store_Save();
 }
 
