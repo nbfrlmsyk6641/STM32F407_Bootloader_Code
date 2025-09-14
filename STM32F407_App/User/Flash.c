@@ -1,7 +1,11 @@
 # include "main.h"
 
-// 定义2KB大小的数组
-uint16_t Store_Data[1024];
+#define STORE_START_ADDRESS ((uint32_t)0x080E0000)
+#define STORE_COUNT		     512
+#define FLASH_SECTOR_11      FLASH_Sector_11
+
+// 定义1KB大小的数组
+uint16_t Store_Data[STORE_COUNT];
 
 uint32_t FLASH_ReadWord(uint32_t Address)
 {
@@ -63,4 +67,23 @@ void FLASH_WriteHalfWord(uint32_t Address, uint16_t Data)
     FLASH_Lock();
 }
 
+void FLASH_Store_Init(void)
+{
+    uint16_t i;
+
+    if (FLASH_ReadHalfWord(STORE_START_ADDRESS) != 0xA5A5)
+    {
+        FLASH_ErasePage(FLASH_SECTOR_11);
+        FLASH_WriteHalfWord(STORE_START_ADDRESS, 0xA5A5);
+        for (i = 1; i < STORE_COUNT; i ++)
+		{
+			FLASH_WriteHalfWord(STORE_START_ADDRESS + i * 2, 0x0000);
+		}
+    }
+
+    for (i = 0; i < STORE_COUNT; i ++)
+	{
+		Store_Data[i] = FLASH_ReadHalfWord(STORE_START_ADDRESS + i * 2);
+	}
+}
 

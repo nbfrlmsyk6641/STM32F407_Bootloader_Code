@@ -8,5 +8,6 @@ void FLASH_EraseAllPage(void);
 void FLASH_ErasePage(uint32_t Sector);
 void FLASH_WriteWord(uint32_t Address, uint32_t Data);
 void FLASH_WriteHalfWord(uint32_t Address, uint16_t Data);
+void FLASH_Store_Init(void);
 
 #endif

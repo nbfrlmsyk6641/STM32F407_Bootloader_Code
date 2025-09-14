@@ -13,6 +13,7 @@ int main(void)
 	TIM3_Configuration();
 	LED_GPIO_Config();	
 	CAN_1_Init();
+	FLASH_Store_Init();
 
 	LED1_OFF;
 
