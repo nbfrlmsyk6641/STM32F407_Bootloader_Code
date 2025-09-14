@@ -5,6 +5,7 @@
 #include "LED.H"
 #include "CAN.h"
 #include "TIM3.h"
+#include "Flash.h"
 
 #endif
 
