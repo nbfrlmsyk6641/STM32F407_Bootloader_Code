@@ -403,6 +403,41 @@
               <FileType>5</FileType>
               <FilePath>.\User\stm32f4xx_it.h</FilePath>
             </File>
+            <File>
+              <FileName>bootloader.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\bootloader.c</FilePath>
+            </File>
+            <File>
+              <FileName>bootloader.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\bootloader.h</FilePath>
+            </File>
+            <File>
+              <FileName>main.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\main.h</FilePath>
+            </File>
+            <File>
+              <FileName>TIM3.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\TIM3.c</FilePath>
+            </File>
+            <File>
+              <FileName>TIM3.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\TIM3.h</FilePath>
+            </File>
+            <File>
+              <FileName>GPIO.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\GPIO.c</FilePath>
+            </File>
+            <File>
+              <FileName>GPIO.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\GPIO.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
