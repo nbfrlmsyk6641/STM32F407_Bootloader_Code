@@ -5,6 +5,7 @@
 #include "bootloader.h"
 #include "GPIO.h"
 #include "TIM3.h"
+#include "Flash.h"
 
 #endif /* __MAIN_H */
 

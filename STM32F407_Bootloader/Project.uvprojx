@@ -438,6 +438,16 @@
               <FileType>5</FileType>
               <FilePath>.\User\GPIO.h</FilePath>
             </File>
+            <File>
+              <FileName>Flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\Flash.c</FilePath>
+            </File>
+            <File>
+              <FileName>Flash.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\Flash.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

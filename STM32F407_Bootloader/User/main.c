@@ -9,17 +9,17 @@ int main(void)
     while(1)
     {
         // 主循环代码
-        if(Task1_Flag)
+        if(Get_Task1_Flag() == 1)
         {
             // 5s等待，闪烁频率高于App
-            Task1_Flag = 0;
+            Clear_Task1_Flag();
             GPIO_ToggleBits(GPIOE, GPIO_Pin_13);
         }
 
-        if(Task2_Flag)
+        if(Get_Task2_Flag() == 1)
         {
             // 5秒后跳转到App
-            Task2_Flag = 0;
+            Clear_Task2_Flag();
             Jump_To_Application();
         }
     }

@@ -1,11 +1,11 @@
 # include "main.h"
 
-// 定时器计数变量与任务标志位
-volatile uint16_t Time_Task1 = 0;
-volatile uint16_t Task1_Flag = 0;
+// 定时器计数变量与任务标志位，加上static前缀表示仅在本文件内可见
+static volatile uint16_t Time_Task1 = 0;
+static volatile uint16_t Task1_Flag = 0;
 
-volatile uint16_t Time_Task2 = 0;
-volatile uint16_t Task2_Flag = 0;
+static volatile uint16_t Time_Task2 = 0;
+static volatile uint16_t Task2_Flag = 0;
 
 void TIM3_Configuration(void)
 {
@@ -68,4 +68,25 @@ void TIM3_IRQHandler(void)
         // 清除中断标志
         TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
     }
+}
+
+// 任务标志位接口函数
+uint16_t Get_Task1_Flag(void)
+{
+    return Task1_Flag;
+}
+
+uint16_t Get_Task2_Flag(void)
+{
+    return Task2_Flag;
+}
+
+void Clear_Task1_Flag(void)
+{
+    Task1_Flag = 0;
+}
+
+void Clear_Task2_Flag(void)
+{
+    Task2_Flag = 0;
 }
