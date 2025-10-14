@@ -6,7 +6,7 @@ uint16_t Time_Count = 0;
 // 周期发送报文变量
 uint32_t TxID = 0x001;
 uint8_t TxLength = 8;
-uint8_t TxData[8] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88};
+uint8_t TxData[8] = {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
 
 // TIM3定时器配置函数
 void TIM3_Configuration(void)
@@ -53,7 +53,7 @@ void TIM3_IRQHandler(void)
     {
         Time_Count++;
 
-        // 每1秒翻转一次LED，并发送一个CAN报文
+        // 每1秒翻转一次LED，并发送一帧CAN报文
         if(Time_Count >= 10)
         {
             Time_Count = 0;

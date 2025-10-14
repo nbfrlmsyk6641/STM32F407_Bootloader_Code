@@ -7,6 +7,9 @@ static volatile uint16_t Task1_Flag = 0;
 static volatile uint16_t Time_Task2 = 0;
 static volatile uint16_t Task2_Flag = 0;
 
+static volatile uint16_t Time_Task3 = 0;
+static volatile uint16_t Task3_Flag = 0;
+
 void TIM3_Configuration(void)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
@@ -52,13 +55,23 @@ void TIM3_IRQHandler(void)
     {
         Time_Task1 ++;
         Time_Task2 ++;
-        
+        Time_Task3 ++;
+
+        // 2 * 100ms = 200ms
         if(Time_Task1 >= 2)
         {
             Time_Task1 = 0;
             Task1_Flag = 1;
         }
 
+        // 10 * 100ms = 1000ms = 1s
+        if(Time_Task3 >= 10)
+        {
+            Time_Task3 = 0;
+            Task3_Flag = 1;
+        }
+
+        // 50 * 100ms = 5000ms = 5s
         if(Time_Task2 >= 50)
         {
             Time_Task2 = 0;
@@ -81,6 +94,11 @@ uint16_t Get_Task2_Flag(void)
     return Task2_Flag;
 }
 
+uint16_t Get_Task3_Flag(void)
+{
+    return Task3_Flag;
+}
+
 void Clear_Task1_Flag(void)
 {
     Task1_Flag = 0;
@@ -89,4 +107,9 @@ void Clear_Task1_Flag(void)
 void Clear_Task2_Flag(void)
 {
     Task2_Flag = 0;
+}
+
+void Clear_Task3_Flag(void)
+{
+    Task3_Flag = 0;
 }

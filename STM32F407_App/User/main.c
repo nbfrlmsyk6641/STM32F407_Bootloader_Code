@@ -8,6 +8,7 @@ int main(void)
 	
 	SCB->VTOR = APP_ADDRESS;
 
+	// 在bootloader跳转到APP之前，执行了关闭所有中断的操作，在这里需要重新打开
 	__enable_irq();
 
 	TIM3_Configuration();
