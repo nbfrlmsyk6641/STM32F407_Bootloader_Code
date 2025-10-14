@@ -6,6 +6,7 @@ void CAN_1_Init(void)
     GPIO_InitTypeDef       GPIO_InitStructure;
     CAN_InitTypeDef        CAN_InitStructure;
     CAN_FilterInitTypeDef  CAN_FilterInitStructure;
+    NVIC_InitTypeDef       NVIC_InitStructure;
 
     // 1、初始化CAN1引脚时钟
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
@@ -46,7 +47,7 @@ void CAN_1_Init(void)
     // 3、调试使用回环模式，调试结束使用正常模式
 	CAN_InitStructure.CAN_Mode = CAN_Mode_Normal;
 
-    // 3、初始化CAN波特率，波特率 = 42MHz / CAN_Prescaler / (CAN_BS1 + CAN_BS2 + 1)，以下数据配置波特率为500Kbps
+    // 3、初始化CAN波特率，波特率 = 42MHz / CAN_Prescaler / (CAN_BS1 + CAN_BS2 + 1)，以下数据配置波特率为1000Kbps
     CAN_InitStructure.CAN_Prescaler = 3;
     CAN_InitStructure.CAN_BS1 = CAN_BS1_10tq;
     CAN_InitStructure.CAN_BS2 = CAN_BS2_3tq;
@@ -71,6 +72,15 @@ void CAN_1_Init(void)
 
     CAN_FilterInit(&CAN_FilterInitStructure);
 
+    // 5、使能CAN1接收中断
+    CAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);
+
+    // 6、配置CAN1中断优先级
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_RX0_IRQn; 
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
 }
 
 uint8_t CAN1_Transmit_TX(uint32_t ID, uint8_t Length, uint8_t *Data)
@@ -169,6 +179,38 @@ void CAN1_Receive_RX(uint32_t *ID, uint8_t *Length, uint8_t *Data)
         // 遥控帧，暂时不做处理
     }
 
+}
+
+// CAN1接收中断服务函数
+void CAN1_RX0_IRQHandler(void)
+{
+    // 接收报文信息
+    uint32_t rx_id;
+    uint8_t  rx_len;
+    uint8_t  rx_data[8];
+
+    // 应答报文信息
+    uint8_t  response_data[2] = {0x33, 0x44};
+
+    // 1. 检查是否是FIFO0消息挂起中断
+    if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)
+    {
+        // 标准库的CAN_Receive函数会自动清除这个中断标志位，
+        // 所以不需要手动调用CAN_ClearITPendingBit()。
+        
+        // 2. 从FIFO0中取出报文
+        CAN1_Receive_RX(&rx_id, &rx_len, rx_data);
+
+        // 3. 逻辑判断
+        if( (rx_id == 0x002) && 
+            (rx_len == 2) && 
+            (rx_data[0] == 0x00) && 
+            (rx_data[1] == 0x11) )
+        {
+            // 4. 报文匹配，发送响应报文
+            CAN1_Transmit_TX(0x003, 2, response_data);
+        }
+    }
 }
 
 
