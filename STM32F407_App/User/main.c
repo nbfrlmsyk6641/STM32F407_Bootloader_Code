@@ -15,8 +15,13 @@ int main(void)
 	LED_GPIO_Config();	
 	CAN_1_Init();
 	FLASH_Store_Init();
+	BKP_Init();
 
+	// 初始化关闭LED1
 	LED1_OFF;
+
+	// 初始化清空BKP
+	BKP_WriteRegister(BKP_FLAG_REGISTER, 0x00000000);
 
 	while(1)
 	{

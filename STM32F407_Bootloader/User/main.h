@@ -7,6 +7,7 @@
 #include "TIM3.h"
 #include "Flash.h"
 #include "CAN.h"
+#include "BKP.h"
 
 #endif /* __MAIN_H */
 

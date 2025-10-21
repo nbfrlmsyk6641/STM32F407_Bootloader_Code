@@ -34,7 +34,7 @@ void TIM3_Configuration(void)
     TIM_ITConfig(TIM3, TIM_IT_Update, ENABLE);
 
     // 4. 配置中断控制器NVIC
-    NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
+    // NVIC_PriorityGroupConfig(NVIC_PriorityGroup_2);
 
     NVIC_InitStructure.NVIC_IRQChannel = TIM3_IRQn;
     NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 2;

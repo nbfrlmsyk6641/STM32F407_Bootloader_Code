@@ -448,6 +448,16 @@
               <FileType>5</FileType>
               <FilePath>.\User\Flash.h</FilePath>
             </File>
+            <File>
+              <FileName>BKP.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\BKP.c</FilePath>
+            </File>
+            <File>
+              <FileName>BKP.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\BKP.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -209,6 +209,12 @@ void CAN1_RX0_IRQHandler(void)
         {
             // 4. 报文匹配，发送响应报文
             CAN1_Transmit_TX(0x003, 2, response_data);
+
+            // 5. 设置标志位，要求进入IAP模式
+            BKP_WriteRegister(BKP_FLAG_REGISTER, BKP_IAP_REQUEST_FLAG);
+
+            // 6. 软件复位系统，跳转到bootloader执行IAP
+            NVIC_SystemReset();
         }
     }
 }
