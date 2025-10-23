@@ -190,7 +190,7 @@ void CAN1_RX0_IRQHandler(void)
     uint8_t  rx_data[8];
 
     // 应答报文信息
-    uint8_t  response_data[2] = {0x33, 0x44};
+    uint8_t  response_data[8] = {0x02, 0x50, 0x03, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};
 
     // 1. 检查是否是FIFO0消息挂起中断
     if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)
@@ -202,19 +202,20 @@ void CAN1_RX0_IRQHandler(void)
         CAN1_Receive_RX(&rx_id, &rx_len, rx_data);
 
         // 3. 逻辑判断
-        if( (rx_id == 0x002) && 
-            (rx_len == 2) && 
-            (rx_data[0] == 0x00) && 
-            (rx_data[1] == 0x11) )
+        if( (rx_id == 0x10) && 
+            (rx_len == 8) && 
+            (rx_data[0] == 0x02) && 
+            (rx_data[1] == 0x10) &&
+            (rx_data[2] == 0x03))
         {
             // 4. 报文匹配，发送响应报文
-            CAN1_Transmit_TX(0x003, 2, response_data);
+            CAN1_Transmit_TX(0x50, 8, response_data);
 
             // 5. 设置标志位，要求进入IAP模式
-            BKP_WriteRegister(BKP_FLAG_REGISTER, BKP_IAP_REQUEST_FLAG);
+            // BKP_WriteRegister(BKP_FLAG_REGISTER, BKP_IAP_REQUEST_FLAG);
 
             // 6. 软件复位系统，跳转到bootloader执行IAP
-            NVIC_SystemReset();
+            // NVIC_SystemReset();
         }
     }
 }
