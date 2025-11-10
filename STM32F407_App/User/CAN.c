@@ -189,8 +189,9 @@ void CAN1_RX0_IRQHandler(void)
     uint8_t  rx_len;
     uint8_t  rx_data[8];
 
-    // 应答报文信息
-    uint8_t  response_data[8] = {0x02, 0x50, 0x03, 0xcc, 0xcc, 0xcc, 0xcc, 0xcc};
+    // 发送报文信息
+    uint8_t  tx_data[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+
 
     // 1. 检查是否是FIFO0消息挂起中断
     if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)
@@ -202,20 +203,20 @@ void CAN1_RX0_IRQHandler(void)
         CAN1_Receive_RX(&rx_id, &rx_len, rx_data);
 
         // 3. 逻辑判断
-        if( (rx_id == 0x10) && 
+        if( (rx_id == 0xC0) && 
             (rx_len == 8) && 
-            (rx_data[0] == 0x02) && 
-            (rx_data[1] == 0x10) &&
-            (rx_data[2] == 0x03))
+            (rx_data[0] == 0x11) && 
+            (rx_data[1] == 0x11) &&
+            (rx_data[2] == 0x11))
         {
-            // 4. 报文匹配，发送响应报文
-            CAN1_Transmit_TX(0x50, 8, response_data);
+            // 4. 收到升级命令，发送确认报文
+            CAN1_Transmit_TX(0xA0, 8, tx_data);
 
-            // 5. 设置标志位，要求进入IAP模式
-            // BKP_WriteRegister(BKP_FLAG_REGISTER, BKP_IAP_REQUEST_FLAG);
+            // 5. 写入数据至BKP寄存器，表示收到升级命令
+            BKP_WriteRegister(BKP_FLAG_REGISTER, 0xAaBbCcDd);
 
-            // 6. 软件复位系统，跳转到bootloader执行IAP
-            // NVIC_SystemReset();
+            // 6. 触发系统复位，进入bootloader
+            NVIC_SystemReset();
         }
     }
 }
