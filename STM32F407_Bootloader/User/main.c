@@ -42,6 +42,9 @@ uint8_t IAP_Flag = 0;
 // IAP状态机
 IAP_State_t g_iap_state = IAP_STATE_IDLE;
 
+// IAP计数变量
+uint8_t IAP_Timeout_Counter = 0;
+
 // BKP变量
 uint32_t BKP_Data = 0;
 
@@ -129,7 +132,7 @@ int main(void)
             uint8_t  rx_len;
             uint8_t  rx_data[8];
 
-            // LED闪烁
+            // LED闪烁，指示正在运行IAP
             if(Get_Task1_Flag() == 1)
             {
                 // 5s等待过程中
@@ -137,6 +140,15 @@ int main(void)
 
                 // 持续闪烁LED且频率高于App的LED闪烁频率
                 GPIO_ToggleBits(GPIOE, GPIO_Pin_13);
+            }
+
+            // IAP超时计数
+            if(Get_Task3_Flag() == 1)
+            {
+                // 1s计数
+                Clear_Task3_Flag();
+
+                IAP_Timeout_Counter++;
             }
 
             // CAN报文接收
@@ -159,9 +171,11 @@ int main(void)
                     CAN1_Transmit_TX(Boot_Confirm_TxID, Boot_Confirm_TxLength, Boot_Confirm_TxData);
                     
                     // 立即切换到下一个状态：等待固件数据
-                    g_iap_state = IAP_STATE_WAIT_METADATA; 
+                    g_iap_state = IAP_STATE_WAIT_METADATA;
                     
-                    // (TODO: 在这里启动一个长超时定时器，如果1分钟内没收到元数据，则复位)
+                    // 重置超时计数器
+                    IAP_Timeout_Counter = 0;
+                    
                     break;
 
                 // 状态2: 等待上位机发送固件数据 (0xC1)
@@ -191,19 +205,34 @@ int main(void)
                             g_iap_state = IAP_STATE_ERASE_FLASH;
                         }
                     }
+                    else if (IAP_Timeout_Counter >= 10)
+                    {
+                        // 超过10秒未收到固件数据，进入错误状态
+                        g_iap_state = IAP_STATE_FAILURE;
+                    }
+
                     break;
                     
                 // 状态3: 根据固件数据擦除Flash
-                case IAP_STATE_ERASE_FLASH:
-                    // Flash_Erase_App_Sectors(g_firmware_total_size); 
+                case IAP_STATE_ERASE_FLASH: 
                     
-                    // 擦除成功，发送“擦除完毕”响应 (0xB1)
-                    CAN1_Transmit_TX(Boot_Erase_TxID, Boot_Erase_TxLength, Boot_Erase_TxData);
-                    
-                    // 切换到下一个状态：等待bin文件数据
-                    g_firmware_bytes_received = 0;
-                    g_expected_packet_num = 0;
-                    g_iap_state = IAP_STATE_WAIT_DATA;
+                    if (IAP_Erase_App_Sectors(g_firmware_total_size) == 0)
+                    {
+                        // 擦除成功，发送“擦除完毕”响应 (0xB1)
+                        CAN1_Transmit_TX(Boot_Erase_TxID, Boot_Erase_TxLength, Boot_Erase_TxData);
+                        
+                        // 切换到下一个状态
+                        g_firmware_bytes_received = 0;
+                        g_expected_packet_num = 0;
+                        g_iap_state = IAP_STATE_WAIT_DATA;
+                        IAP_Timeout_Counter = 0; 
+                    }
+                    else
+                    {
+                        // 擦除失败
+                        g_iap_state = IAP_STATE_FAILURE;
+                    }
+
                     break;
                     
                 // 状态4: 等待固件数据包
@@ -218,6 +247,15 @@ int main(void)
                     // 7. (如果OK) g_firmware_bytes_received += 6 (数据长度)
                     // 8. (如果OK) 检查 if (g_firmware_bytes_received >= g_firmware_total_size) -> g_iap_state = IAP_STATE_WAIT_EOT;
                     // 9. (如果序列号错误) 重复发送上一个ACK
+                    if(rx_id == 0xC2)
+                    {
+                        IAP_Timeout_Counter = 0;
+                    }
+                    else if (IAP_Timeout_Counter >= 10)
+                    {
+                        // 超过10秒未收到固件数据包，进入错误状态
+                        g_iap_state = IAP_STATE_FAILURE;
+                    }
                     break;
                     
                 // 状态5: 等待传输结束 (0xC3)
@@ -246,10 +284,14 @@ int main(void)
                     
                 // 状态8: 更新失败 (CRC错误或大小错误)
                 case IAP_STATE_FAILURE:
+
                     // 通知上位机更新失败，并准备好重试
                     CAN1_Transmit_TX(Boot_Error_TxID, Boot_Error_TxLength, Boot_Error_TxData);
+
                     // 切换回等待固件数据状态，以便上位机重新发起流程
                     g_iap_state = IAP_STATE_START;
+                    IAP_Timeout_Counter = 0;
+
                     break;
 
                 // 默认状态 (异常处理)

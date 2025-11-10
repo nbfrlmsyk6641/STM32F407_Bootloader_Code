@@ -11,5 +11,6 @@ void FLASH_WriteHalfWord(uint32_t Address, uint16_t Data);
 void FLASH_Store_Init(void);
 void FLASH_Store_Save(void);
 void FLASH_Store_Clear(void);
+uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size);
 
 #endif

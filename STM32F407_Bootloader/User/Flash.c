@@ -17,12 +17,54 @@
  *
  ********************************************************************************/
 
+ // 测试存储区起始地址及大小定义
 #define STORE_START_ADDRESS ((uint32_t)0x080E0000)
 #define STORE_COUNT		     512
 #define FLASH_SECTOR_11      FLASH_Sector_11
 
+
+// Application起始地址
+#define APPLICATION_START_ADDRESS ((uint32_t)0x08008000)
+
+// 分配给Application的空间所占用的Flash扇区
+#define FLASH_SECTOR_2      FLASH_Sector_2
+#define FLASH_SECTOR_3      FLASH_Sector_3
+#define FLASH_SECTOR_4      FLASH_Sector_4
+#define FLASH_SECTOR_5      FLASH_Sector_5
+#define FLASH_SECTOR_6      FLASH_Sector_6
+
+// 分配给Application的空间所占用的扇区的起始地址
+#define APPLICATION_SECTOR_2   ((uint32_t)0x08008000)
+#define APPLICATION_SECTOR_3   ((uint32_t)0x0800C000)
+#define APPLICATION_SECTOR_4   ((uint32_t)0x08010000)
+#define APPLICATION_SECTOR_5   ((uint32_t)0x08020000)
+#define APPLICATION_SECTOR_6   ((uint32_t)0x08040000)
+
+// 分配给Application的扇区数量
+#define APP_SECTOR_COUNT 5
+
+static const uint32_t APP_SECTOR_LIST[5] = {
+    FLASH_SECTOR_2, 
+    FLASH_SECTOR_3, 
+    FLASH_SECTOR_4, 
+    FLASH_SECTOR_5, 
+    FLASH_SECTOR_6
+};
+
+static const uint32_t APP_SECTOR_START_ADDR[5] = {
+    APPLICATION_SECTOR_2, 
+    APPLICATION_SECTOR_3, 
+    APPLICATION_SECTOR_4, 
+    APPLICATION_SECTOR_5, 
+    APPLICATION_SECTOR_6  
+};
+
+
+
 // 定义1KB大小的数组，数组大小1KB，一般就对应每次写入就是1KB，512个16位数据
 uint16_t Store_Data[STORE_COUNT];
+
+
 
 uint32_t FLASH_ReadWord(uint32_t Address)
 {
@@ -46,7 +88,7 @@ void MyFLASH_EraseAllSectors(void)
 {
     FLASH_Unlock();
 
-    // 擦除所有页,慎用，MCU全擦完就变砖
+    // 擦除所有页，慎用，MCU全擦完就变砖
     FLASH_EraseAllSectors(VoltageRange_3);
 
     FLASH_Lock();
@@ -144,5 +186,37 @@ void FLASH_Store_Clear(void)
 	}
 
 	FLASH_Store_Save();
+}
+
+uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
+{
+    uint32_t i = 0;
+    uint32_t firmware_end_address = 0;
+    
+    // 1. 计算固件的结束地址
+    firmware_end_address = APPLICATION_START_ADDRESS + firmware_size - 1;
+
+    FLASH_Unlock();
+    FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | 
+                    FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR|FLASH_FLAG_PGSERR);
+
+    // 2. 循环遍历所有App可能占用的扇区
+    for (i = 0; i < APP_SECTOR_COUNT; i++)
+    {
+        // 3. 检查固件的结束地址是否落在了这个扇区或更远的扇区
+        if (firmware_end_address >= APP_SECTOR_START_ADDR[i])
+        {
+            // 需要擦除这个扇区
+            if (FLASH_EraseSector(APP_SECTOR_LIST[i], VoltageRange_3) != FLASH_COMPLETE)
+            {
+                // 擦除失败！
+                FLASH_Lock();
+                return 1; 
+            }
+        }
+    }
+
+    FLASH_Lock();
+    return 0; // 所有相关扇区均擦除成功
 }
 
