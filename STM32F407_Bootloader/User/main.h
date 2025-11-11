@@ -9,6 +9,7 @@
 #include "Flash.h"
 #include "CAN.h"
 #include "BKP.h"
+#include "CRC.h"
 
 #endif /* __MAIN_H */
 

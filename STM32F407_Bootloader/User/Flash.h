@@ -39,6 +39,5 @@ void FLASH_Store_Init(void);
 void FLASH_Store_Save(void);
 void FLASH_Store_Clear(void);
 uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size);
-uint32_t IAP_Calculate_CRC_On_Flash(uint32_t start_addr, uint32_t size);
 
 #endif

@@ -468,6 +468,16 @@
               <FileType>5</FileType>
               <FilePath>.\User\BKP.h</FilePath>
             </File>
+            <File>
+              <FileName>CRC.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\CRC.c</FilePath>
+            </File>
+            <File>
+              <FileName>CRC.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\CRC.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

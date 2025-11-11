@@ -194,47 +194,5 @@ uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
     return 0; // 所有相关扇区均擦除成功
 }
 
-uint32_t IAP_Calculate_CRC_On_Flash(uint32_t start_addr, uint32_t size)
-{
-    uint32_t i = 0;
-    uint32_t word_count = 0;
-    uint32_t temp_word = 0;
-    uint8_t remaining_bytes = 0;
 
-    // 1. 开启CRC外设的时钟
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
-    
-    // 2. 复位CRC单元 (清除上一次的计算结果)
-    CRC_ResetDR();
-
-    // 3. 计算有多少个完整的32位字 (Word)
-    word_count = size / 4;
-    remaining_bytes = size % 4; // 计算剩余不足4字节的字节数
-
-    // 4. 循环计算所有完整的字
-    for (i = 0; i < word_count; i++)
-    {
-        // 从Flash中读取一个32位字
-        temp_word = FLASH_ReadWord(start_addr + i * 4); 
-        // 将这个字送入硬件CRC单元进行计算
-        CRC_CalcCRC(temp_word);
-    }
-
-    // 5. 处理剩余的字节 (如果固件大小不是4的整数倍)
-    if (remaining_bytes > 0)
-    {
-        temp_word = 0; // 清零
-        // 读取剩余的 1, 2, 或 3 个字节
-        for (i = 0; i < remaining_bytes; i++)
-        {
-            // 按字节读取，并移位到正确的位置 (小端模式)
-            temp_word |= (uint32_t)(FLASH_ReadByte(start_addr + word_count * 4 + i)) << (i * 8);
-        }
-        
-        CRC_CalcCRC(temp_word);
-    }
-
-    // 6. 返回最终的CRC计算结果
-    return CRC_GetCRC();
-}
 

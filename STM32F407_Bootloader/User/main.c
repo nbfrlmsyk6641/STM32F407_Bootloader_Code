@@ -1,5 +1,7 @@
 #include "main.h" 
 
+#define APPLICATION_START_ADDRESS ((uint32_t)0x08008000)
+
 // 定义软件更新状态机枚举变量
 typedef enum 
 {
@@ -69,6 +71,7 @@ uint8_t last_ack_num = 0;
 
 // CRC校验变量
 uint32_t local_crc = 0;
+uint32_t g_debug_failed_crc = 0;
 
 int main(void)
 {
@@ -353,6 +356,7 @@ int main(void)
                     else
                     {
                         // 校验失败！
+                        g_debug_failed_crc = local_crc;
                         g_iap_state = IAP_STATE_FAILURE;
                     }
 
@@ -373,6 +377,19 @@ int main(void)
                 case IAP_STATE_FAILURE:
 
                     // 通知上位机更新失败，并准备好重试
+
+                    // 按小端模式打包 (匹配Python的 <I )
+                    Boot_Error_TxData[0] = (uint8_t)(g_debug_failed_crc);
+                    Boot_Error_TxData[1] = (uint8_t)(g_debug_failed_crc >> 8);
+                    Boot_Error_TxData[2] = (uint8_t)(g_debug_failed_crc >> 16);
+                    Boot_Error_TxData[3] = (uint8_t)(g_debug_failed_crc >> 24);
+                    
+                    // (你也可以把Python期望的CRC放在后4字节)
+                    Boot_Error_TxData[4] = (uint8_t)(g_firmware_total_crc);
+                    Boot_Error_TxData[5] = (uint8_t)(g_firmware_total_crc >> 8);
+                    Boot_Error_TxData[6] = (uint8_t)(g_firmware_total_crc >> 16);
+                    Boot_Error_TxData[7] = (uint8_t)(g_firmware_total_crc >> 24);
+                
                     CAN1_Transmit_TX(Boot_Error_TxID, Boot_Error_TxLength, Boot_Error_TxData);
 
                     // 切换回等待固件数据状态，以便上位机重新发起流程
