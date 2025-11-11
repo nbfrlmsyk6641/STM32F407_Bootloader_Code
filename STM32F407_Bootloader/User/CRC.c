@@ -5,7 +5,7 @@ uint32_t IAP_Software_Calculate_CRC(const uint8_t * pData, uint32_t uiDataSize)
     uint32_t i_index;
     uint32_t j_index;
     uint32_t uiCrc = 0xFFFFFFFF; // 1. 初始值
-    const uint32_t uiPolynomial = 0x04C11DB7; // (这是一个反转的多项式，用于匹配Reflect In/Out)
+    //const uint32_t uiPolynomial = 0x04C11DB7; // (这是一个反转的多项式，用于匹配Reflect In/Out)
 
     for (i_index = 0; i_index < uiDataSize; i_index++)
     {
