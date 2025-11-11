@@ -2,6 +2,7 @@
 #define __MAIN_H
 
 #include "stm32f4xx.h"
+#include "stm32f4xx_crc.h"
 #include "bootloader.h"
 #include "GPIO.h"
 #include "TIM3.h"

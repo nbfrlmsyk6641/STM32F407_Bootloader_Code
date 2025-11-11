@@ -17,32 +17,6 @@
  *
  ********************************************************************************/
 
- // 测试存储区起始地址及大小定义
-#define STORE_START_ADDRESS ((uint32_t)0x080E0000)
-#define STORE_COUNT		     512
-#define FLASH_SECTOR_11      FLASH_Sector_11
-
-
-// Application起始地址
-#define APPLICATION_START_ADDRESS ((uint32_t)0x08008000)
-
-// 分配给Application的空间所占用的Flash扇区
-#define FLASH_SECTOR_2      FLASH_Sector_2
-#define FLASH_SECTOR_3      FLASH_Sector_3
-#define FLASH_SECTOR_4      FLASH_Sector_4
-#define FLASH_SECTOR_5      FLASH_Sector_5
-#define FLASH_SECTOR_6      FLASH_Sector_6
-
-// 分配给Application的空间所占用的扇区的起始地址
-#define APPLICATION_SECTOR_2   ((uint32_t)0x08008000)
-#define APPLICATION_SECTOR_3   ((uint32_t)0x0800C000)
-#define APPLICATION_SECTOR_4   ((uint32_t)0x08010000)
-#define APPLICATION_SECTOR_5   ((uint32_t)0x08020000)
-#define APPLICATION_SECTOR_6   ((uint32_t)0x08040000)
-
-// 分配给Application的扇区数量
-#define APP_SECTOR_COUNT 5
-
 static const uint32_t APP_SECTOR_LIST[5] = {
     FLASH_SECTOR_2, 
     FLASH_SECTOR_3, 
@@ -193,7 +167,7 @@ uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
     uint32_t i = 0;
     uint32_t firmware_end_address = 0;
     
-    // 1. 计算固件的结束地址
+    // 1. 计算固件的结束地址，解锁Flash，清除标志位
     firmware_end_address = APPLICATION_START_ADDRESS + firmware_size - 1;
 
     FLASH_Unlock();
@@ -206,7 +180,7 @@ uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
         // 3. 检查固件的结束地址是否落在了这个扇区或更远的扇区
         if (firmware_end_address >= APP_SECTOR_START_ADDR[i])
         {
-            // 需要擦除这个扇区
+            // 如果落在了这个扇区就需要擦掉这个扇区
             if (FLASH_EraseSector(APP_SECTOR_LIST[i], VoltageRange_3) != FLASH_COMPLETE)
             {
                 // 擦除失败！
@@ -218,5 +192,49 @@ uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
 
     FLASH_Lock();
     return 0; // 所有相关扇区均擦除成功
+}
+
+uint32_t IAP_Calculate_CRC_On_Flash(uint32_t start_addr, uint32_t size)
+{
+    uint32_t i = 0;
+    uint32_t word_count = 0;
+    uint32_t temp_word = 0;
+    uint8_t remaining_bytes = 0;
+
+    // 1. 开启CRC外设的时钟
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, ENABLE);
+    
+    // 2. 复位CRC单元 (清除上一次的计算结果)
+    CRC_ResetDR();
+
+    // 3. 计算有多少个完整的32位字 (Word)
+    word_count = size / 4;
+    remaining_bytes = size % 4; // 计算剩余不足4字节的字节数
+
+    // 4. 循环计算所有完整的字
+    for (i = 0; i < word_count; i++)
+    {
+        // 从Flash中读取一个32位字
+        temp_word = FLASH_ReadWord(start_addr + i * 4); 
+        // 将这个字送入硬件CRC单元进行计算
+        CRC_CalcCRC(temp_word);
+    }
+
+    // 5. 处理剩余的字节 (如果固件大小不是4的整数倍)
+    if (remaining_bytes > 0)
+    {
+        temp_word = 0; // 清零
+        // 读取剩余的 1, 2, 或 3 个字节
+        for (i = 0; i < remaining_bytes; i++)
+        {
+            // 按字节读取，并移位到正确的位置 (小端模式)
+            temp_word |= (uint32_t)(FLASH_ReadByte(start_addr + word_count * 4 + i)) << (i * 8);
+        }
+        
+        CRC_CalcCRC(temp_word);
+    }
+
+    // 6. 返回最终的CRC计算结果
+    return CRC_GetCRC();
 }
 
