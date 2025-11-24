@@ -28,14 +28,7 @@ uint32_t IAP_Software_Calculate_CRC(const uint8_t * pData, uint32_t uiDataSize)
     return (uiCrc ^ 0xFFFFFFFF);
 }
 
-/**
- * @brief  IAP_Calculate_CRC_On_Flash (软件版)
- * @note   这是 IAP_STATE_VERIFY 要调用的接口
- *
- * @param  start_address: Flash 起始地址
- * @param  size_in_bytes: 要计算的总字节数 (g_firmware_total_size)
- * @return 32-bit CRC (PKZIP 标准)
- */
+
 uint32_t IAP_Calculate_CRC_On_Flash(uint32_t start_address, uint32_t size_in_bytes)
 {
     // 1. (重要!) 确保CRC时钟是关闭的，我们不再需要它

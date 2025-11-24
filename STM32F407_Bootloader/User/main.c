@@ -93,7 +93,7 @@ int main(void)
     }
     else
     {
-        // 不存在升级请求
+        // 不存在升级请求，准备执行5s初始化后进App
         IAP_Flag = 0;
     }
 
