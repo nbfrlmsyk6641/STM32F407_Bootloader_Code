@@ -1,12 +1,10 @@
 # include "main.h"
 
 // 定时器计数变量
-uint16_t Time_Count = 0;
+static uint16_t Time_Count = 0;
 
-// 周期发送报文变量
-uint32_t TxID = 0x001;
-uint8_t TxLength = 8;
-uint8_t TxData[8] = {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
+// 定时器计时任务标志位
+volatile uint8_t g_timer_1s_flag = 0;
 
 // TIM3定时器配置函数
 void TIM3_Configuration(void)
@@ -51,14 +49,15 @@ void TIM3_IRQHandler(void)
 {
     if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
     {
-        Time_Count++;
+        Time_Count ++;
 
-        // 每1秒翻转一次LED，并发送一帧CAN报文
-        if(Time_Count >= 10)
+        // 每2秒翻转一次LED，并发送一帧CAN报文
+        if(Time_Count >= 20)
         {
             Time_Count = 0;
-            GPIO_ToggleBits(GPIOE, GPIO_Pin_13);
-            CAN1_Transmit_TX(TxID, TxLength, TxData);
+
+            // 设置1秒标志位
+            g_timer_1s_flag = 1;
         }
 
         // 清除中断标志

@@ -8,5 +8,7 @@
 #include "Flash.h"
 #include "BKP.h"
 
+extern volatile uint8_t g_timer_1s_flag;
+
 #endif
 

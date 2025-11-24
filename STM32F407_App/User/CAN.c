@@ -1,5 +1,56 @@
 # include "main.h"
 
+// 初始化环形缓冲器
+static RingBuffer_t g_rx_buffer = { {0}, 0, 0 };
+
+// 环形计数器溢出变量
+volatile uint32_t g_buffer_overflow_cnt = 0;  // 溢出计数器
+volatile uint8_t  g_buffer_error_flag = 0;    // 溢出标志位
+
+// 环形缓冲器写入函数
+static void RingBuffer_Write(CanRxMsg msg)
+{
+    // 计算下一个写入位置，通过取余实现环绕
+    uint16_t next_head = (g_rx_buffer.head + 1) % RX_RING_BUFFER_SIZE;
+
+    // 检查是否已满，next_head = tail代表缓冲器满
+    if (next_head != g_rx_buffer.tail)
+    {
+        // 1. 存入数据
+        g_rx_buffer.buffer[g_rx_buffer.head] = msg;
+        
+        // 2. 移动头指针
+        g_rx_buffer.head = next_head;
+    }
+    else
+    {
+        // 记录溢出次数
+        g_buffer_overflow_cnt++;
+        
+        g_buffer_error_flag = 1;
+    }
+}
+
+// 环形缓冲器读取函数
+uint8_t CAN_RingBuffer_Read(CanRxMsg* msg)
+{
+    // 检查是否为空, head = tail 代表缓冲器空
+    if (g_rx_buffer.head == g_rx_buffer.tail)
+    {
+        return 0; // 没有数据
+    }
+
+    // 1. 读取数据
+    *msg = g_rx_buffer.buffer[g_rx_buffer.tail];
+
+    // 2. 移动尾指针
+    g_rx_buffer.tail = (g_rx_buffer.tail + 1) % RX_RING_BUFFER_SIZE;
+
+    return 1; // 成功
+}
+
+
+
 void CAN_1_Init(void)
 {
     // 结构体定义
@@ -184,40 +235,16 @@ void CAN1_Receive_RX(uint32_t *ID, uint8_t *Length, uint8_t *Data)
 // CAN1接收中断服务函数
 void CAN1_RX0_IRQHandler(void)
 {
-    // 接收报文信息
-    uint32_t rx_id;
-    uint8_t  rx_len;
-    uint8_t  rx_data[8];
+    CanRxMsg RxMessage;
 
-    // 发送报文信息
-    uint8_t  tx_data[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-
-    // 1. 检查是否是FIFO0消息挂起中断
+    // 1. 检查 FIFO0 消息挂起中断
     if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)
     {
-        // 标准库的CAN_Receive函数会自动清除这个中断标志位，
-        // 所以不需要手动调用CAN_ClearITPendingBit()。
-        
-        // 2. 从FIFO0中取出报文
-        CAN1_Receive_RX(&rx_id, &rx_len, rx_data);
+        // 2. 从硬件 FIFO 读取报文
+        CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
 
-        // 3. 逻辑判断
-        if( (rx_id == 0xC0) && 
-            (rx_len == 8) && 
-            (rx_data[0] == 0x11) && 
-            (rx_data[1] == 0x11) &&
-            (rx_data[2] == 0x11))
-        {
-            // 4. 收到升级命令，发送确认报文
-            CAN1_Transmit_TX(0xA0, 8, tx_data);
-
-            // 5. 写入数据至BKP寄存器，表示收到升级命令
-            BKP_WriteRegister(BKP_FLAG_REGISTER, 0xAaBbCcDd);
-
-            // 6. 触发系统复位，进入bootloader
-            NVIC_SystemReset();
-        }
+        // 3. 将报文推入软件环形缓冲器
+        RingBuffer_Write(RxMessage);
     }
 }
 
