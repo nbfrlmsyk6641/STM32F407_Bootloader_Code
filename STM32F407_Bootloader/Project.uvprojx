@@ -478,6 +478,16 @@
               <FileType>5</FileType>
               <FilePath>.\User\CRC.h</FilePath>
             </File>
+            <File>
+              <FileName>ISO15765.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\ISO15765.c</FilePath>
+            </File>
+            <File>
+              <FileName>ISO15765.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\ISO15765.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

@@ -7,6 +7,7 @@
 #include "TIM3.h"
 #include "Flash.h"
 #include "BKP.h"
+#include "ISO15765.h"
 
 extern volatile uint8_t g_timer_1s_flag;
 

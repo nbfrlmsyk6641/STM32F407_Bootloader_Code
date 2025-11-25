@@ -5,7 +5,7 @@
 // 环形缓冲器定义
 
 // 缓冲器最大可接收64帧报文
-#define RX_RING_BUFFER_SIZE  64
+#define RX_RING_BUFFER_SIZE  256
 
 // 环形缓冲器结构体
 typedef struct {

@@ -3,6 +3,17 @@
 // 定义APP的起始地址，起始地址必须为4字节对齐
 #define APP_ADDRESS    (uint32_t)0x08008000
 
+// 诊断设备的物理请求ID
+#define UDS_PHYSICAL_REQUEST_ID   0x7E0
+
+// ISO15765协议上下文变量
+extern IsoTpLink_t g_isotp;
+
+// ISO15765协议变量
+uint8_t sid;
+uint8_t sub_func;
+uint8_t ISO_resp_data[2];
+
 // 定义周期性发送报文变量
 uint32_t Cyc_TxID = 0x001;
 uint8_t Cyc_TxLength = 8;
@@ -26,6 +37,7 @@ int main(void)
 	CAN_1_Init();
 	FLASH_Store_Init();
 	BKP_Init();
+    ISOTP_Init();
 
 	// 初始化关闭LED1
 	LED1_OFF;
@@ -63,9 +75,43 @@ int main(void)
                 // 3. 触发系统复位，进入bootloader
                 NVIC_SystemReset();
             }
+
+            // 处理ISO15765协议接收(测试)
+            if (roll_msg_id == UDS_PHYSICAL_REQUEST_ID)
+            {
+                ISOTP_Receive_Handler(&roll_recv_msg);
+            }
+
+            if (g_isotp.state == ISOTP_RX_COMPLETE)
+            {
+                sid = g_isotp.rx_buffer[0];
+                sub_func = 0;
+
+                // 判断是否有子功能
+                if (g_isotp.rx_total_len > 1) 
+                {
+                    sub_func = g_isotp.rx_buffer[1];
+                }
+
+                if (sid == 0x11)
+                {
+                    ISO_resp_data[0] = 0x51;
+                    ISO_resp_data[1] = sub_func;
+
+                    // 协议发送单帧响应
+                    ISOTP_Transmit_SF(0x7E8, ISO_resp_data, 2);
+
+                    ISOTP_Init();
+                }
+            }
+            else if (g_isotp.state == ISOTP_RX_ERROR)
+            {
+                // 发生错误，重置状态
+                ISOTP_Init();
+            }
         }
 
-		// 每0.2秒执行一次的任务
+		// 每2秒执行一次的任务
 		if (g_timer_1s_flag == 1)
 		{
 			g_timer_1s_flag = 0;

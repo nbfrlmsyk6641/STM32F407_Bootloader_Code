@@ -51,8 +51,8 @@ void TIM3_IRQHandler(void)
     {
         Time_Count ++;
 
-        // 每0.2秒翻转一次LED，并发送一帧CAN报文
-        if(Time_Count >= 2)
+        // 每2秒翻转一次LED，并发送一帧CAN报文
+        if(Time_Count >= 20)
         {
             Time_Count = 0;
 

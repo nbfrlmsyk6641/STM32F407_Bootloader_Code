@@ -1,6 +1,12 @@
 #include "main.h" 
 
+// UDS诊断设备发送至MCU端的CAN ID
+#define UDS_PHYSICAL_REQUEST_ID   0x7E0
+
 #define APPLICATION_START_ADDRESS ((uint32_t)0x08008000)
+
+// ISO-TP接收上下文对象
+extern IsoTpLink_t g_isotp;
 
 // 定义软件更新状态机枚举变量
 typedef enum 
@@ -16,6 +22,7 @@ typedef enum
     IAP_STATE_FAILURE           // 8: 更新失败，等待重试
 } IAP_State_t;
 
+// 环形缓冲器接收变量
 CanRxMsg roll_recv_msg;
 
 // 无升级时发送的报文变量
@@ -144,6 +151,7 @@ int main(void)
         TIM3_Configuration();
         LED_GPIO_Config();
         CAN_1_Init();
+        ISOTP_Init();
 
         // 进入IAP状态机，启动IAP流程
         g_iap_state = IAP_STATE_START;
@@ -178,16 +186,43 @@ int main(void)
             if(CAN_RingBuffer_Read(&roll_recv_msg) == 1)
             {
                 rx_id = roll_recv_msg.StdId;
+
                 rx_len = roll_recv_msg.DLC;
+
                 for (i = 0; i < rx_len; i++)
                 {
                     rx_data[i] = roll_recv_msg.Data[i];
+                }
+
+                // 通过CAN ID判断是否为UDS诊断请求报文,如果是则交给协议处理
+                if (rx_id == UDS_PHYSICAL_REQUEST_ID)
+                {
+                    ISOTP_Receive_Handler(&roll_recv_msg);
                 }
             }
             else
             {   
                 // 无报文接收，清一下ID，避免干扰状态机
                 rx_id = 0;
+            }
+
+            // 判断协议是否处理完数据包
+            if (g_isotp.state == ISOTP_RX_COMPLETE)
+            {
+                // 获取服务 ID (SID) - UDS 数据的第 1 个字节
+                uint8_t sid = g_isotp.rx_buffer[0];
+
+                if (sid == 0x10) 
+                {
+                    GPIO_ToggleBits(GPIOE, GPIO_Pin_13); 
+                }
+
+                ISOTP_Init(); 
+            }   
+            else if (g_isotp.state == ISOTP_RX_ERROR)
+            {
+                // 发生传输错误，复位协议，等待重传
+                ISOTP_Init();
             }
 
             // IAP状态机处理流程
