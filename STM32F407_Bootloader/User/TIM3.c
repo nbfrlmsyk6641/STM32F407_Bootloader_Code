@@ -58,7 +58,7 @@ void TIM3_IRQHandler(void)
         Time_Task3 ++;
 
         // 2 * 100ms = 200ms
-        if(Time_Task1 >= 2)
+        if(Time_Task1 >= 4)
         {
             Time_Task1 = 0;
             Task1_Flag = 1;

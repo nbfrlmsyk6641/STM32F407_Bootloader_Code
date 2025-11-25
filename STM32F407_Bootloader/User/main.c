@@ -16,6 +16,8 @@ typedef enum
     IAP_STATE_FAILURE           // 8: 更新失败，等待重试
 } IAP_State_t;
 
+CanRxMsg roll_recv_msg;
+
 // 无升级时发送的报文变量
 uint32_t Normal_TxID = 0xB0;
 uint8_t Normal_TxLength = 8;
@@ -72,6 +74,8 @@ uint8_t last_ack_num = 0;
 // CRC校验变量
 uint32_t local_crc = 0;
 uint32_t g_debug_failed_crc = 0;
+
+uint8_t i;
 
 int main(void)
 {
@@ -171,9 +175,14 @@ int main(void)
             }
 
             // CAN报文接收
-            if(CAN1_ReceiveFlag() == 1)
+            if(CAN_RingBuffer_Read(&roll_recv_msg) == 1)
             {
-                CAN1_Receive_RX(&rx_id, &rx_len, rx_data);
+                rx_id = roll_recv_msg.StdId;
+                rx_len = roll_recv_msg.DLC;
+                for (i = 0; i < rx_len; i++)
+                {
+                    rx_data[i] = roll_recv_msg.Data[i];
+                }
             }
             else
             {   

@@ -1,12 +1,63 @@
 # include "main.h"
 
+// 初始化环形缓冲器
+static RingBuffer_t g_rx_buffer = { {0}, 0, 0 };
+
+// 环形计数器溢出变量
+volatile uint32_t g_buffer_overflow_cnt = 0;  // 溢出计数器
+volatile uint8_t  g_buffer_error_flag = 0;    // 溢出标志位
+
+// 环形缓冲器写入函数
+static void RingBuffer_Write(CanRxMsg msg)
+{
+    // 计算下一个写入位置，通过取余实现环绕
+    uint16_t next_head = (g_rx_buffer.head + 1) % RX_RING_BUFFER_SIZE;
+
+    // 检查是否已满，next_head = tail代表缓冲器满
+    if (next_head != g_rx_buffer.tail)
+    {
+        // 1. 存入数据
+        g_rx_buffer.buffer[g_rx_buffer.head] = msg;
+        
+        // 2. 移动头指针
+        g_rx_buffer.head = next_head;
+    }
+    else
+    {
+        // 记录溢出次数
+        g_buffer_overflow_cnt++;
+        
+        g_buffer_error_flag = 1;
+    }
+}
+
+// 环形缓冲器读取函数
+uint8_t CAN_RingBuffer_Read(CanRxMsg* msg)
+{
+    // 检查是否为空, head = tail 代表缓冲器空
+    if (g_rx_buffer.head == g_rx_buffer.tail)
+    {
+        return 0; // 没有数据
+    }
+
+    // 1. 读取数据
+    *msg = g_rx_buffer.buffer[g_rx_buffer.tail];
+
+    // 2. 移动尾指针
+    g_rx_buffer.tail = (g_rx_buffer.tail + 1) % RX_RING_BUFFER_SIZE;
+
+    return 1; // 成功
+}
+
+
+
 void CAN_1_Init(void)
 {
     // 结构体定义
     GPIO_InitTypeDef       GPIO_InitStructure;
     CAN_InitTypeDef        CAN_InitStructure;
     CAN_FilterInitTypeDef  CAN_FilterInitStructure;
-    // NVIC_InitTypeDef       NVIC_InitStructure;
+    NVIC_InitTypeDef       NVIC_InitStructure;
 
     // 1、初始化CAN1引脚时钟
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
@@ -73,14 +124,14 @@ void CAN_1_Init(void)
     CAN_FilterInit(&CAN_FilterInitStructure);
 
     // 5、使能CAN1接收中断
-    // CAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);
+    CAN_ITConfig(CAN1, CAN_IT_FMP0, ENABLE);
 
     // 6、配置CAN1中断优先级
-    // NVIC_InitStructure.NVIC_IRQChannel = CAN1_RX0_IRQn; 
-    // NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
-    // NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
-    // NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
-    // NVIC_Init(&NVIC_InitStructure);
+    NVIC_InitStructure.NVIC_IRQChannel = CAN1_RX0_IRQn; 
+    NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 1;
+    NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+    NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+    NVIC_Init(&NVIC_InitStructure);
 }
 
 uint8_t CAN1_Transmit_TX(uint32_t ID, uint8_t Length, uint8_t *Data)
@@ -184,32 +235,16 @@ void CAN1_Receive_RX(uint32_t *ID, uint8_t *Length, uint8_t *Data)
 // CAN1接收中断服务函数
 void CAN1_RX0_IRQHandler(void)
 {
-    // 接收报文信息
-    uint32_t rx_id;
-    uint8_t  rx_len;
-    uint8_t  rx_data[8];
+    CanRxMsg RxMessage;
 
-    // 应答报文信息
-    uint8_t  response_data[2] = {0x33, 0x44};
-
-    // 1. 检查是否是FIFO0消息挂起中断
+    // 1. 检查 FIFO0 消息挂起中断
     if (CAN_GetITStatus(CAN1, CAN_IT_FMP0) != RESET)
     {
-        // 标准库的CAN_Receive函数会自动清除这个中断标志位，
-        // 所以不需要手动调用CAN_ClearITPendingBit()。
-        
-        // 2. 从FIFO0中取出报文
-        CAN1_Receive_RX(&rx_id, &rx_len, rx_data);
+        // 2. 从硬件 FIFO 读取报文
+        CAN_Receive(CAN1, CAN_FIFO0, &RxMessage);
 
-        // 3. 逻辑判断
-        if( (rx_id == 0x002) && 
-            (rx_len == 2) && 
-            (rx_data[0] == 0x00) && 
-            (rx_data[1] == 0x11) )
-        {
-            // 4. 报文匹配，发送响应报文
-            CAN1_Transmit_TX(0x003, 2, response_data);
-        }
+        // 3. 将报文推入软件环形缓冲器
+        RingBuffer_Write(RxMessage);
     }
 }
 

@@ -65,7 +65,7 @@ int main(void)
             }
         }
 
-		// 每2秒执行一次的任务
+		// 每0.2秒执行一次的任务
 		if (g_timer_1s_flag == 1)
 		{
 			g_timer_1s_flag = 0;

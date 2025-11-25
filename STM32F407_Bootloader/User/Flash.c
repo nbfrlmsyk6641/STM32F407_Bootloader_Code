@@ -171,8 +171,11 @@ uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
     firmware_end_address = APPLICATION_START_ADDRESS + firmware_size - 1;
 
     FLASH_Unlock();
+
     FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | 
                     FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR|FLASH_FLAG_PGSERR);
+    
+    __disable_irq();
 
     // 2. 循环遍历所有App可能占用的扇区
     for (i = 0; i < APP_SECTOR_COUNT; i++)
@@ -185,12 +188,14 @@ uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
             {
                 // 擦除失败！
                 FLASH_Lock();
+                __enable_irq();
                 return 1; 
             }
         }
     }
 
     FLASH_Lock();
+    __enable_irq();
     return 0; // 所有相关扇区均擦除成功
 }
 
