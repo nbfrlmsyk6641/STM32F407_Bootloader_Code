@@ -18,8 +18,8 @@ static void ISOTP_Send_FC(void)
     // Byte 1: BS (Block Size) = 0 (不分块，一次发完)
     tx_data[1] = 0x00; 
     
-    // Byte 2: STmin (最小间隔) = 2ms 
-    tx_data[2] = 0x02; 
+    // Byte 2: STmin (最小间隔) = 5ms 
+    tx_data[2] = 0x05; 
     
     // 发送报文
     CAN1_Transmit_TX(ISOTP_TX_ID, 8, tx_data);
