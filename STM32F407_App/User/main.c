@@ -20,9 +20,6 @@ uint8_t g_pre_prog_condition = 0;
 // UDS服务时间计数
 uint32_t g_s3_server_timer = 0;
 
-// UDS超时
-#define S3_TIMEOUT_VALUE  5000
-
 // ISO15765协议上下文变量
 extern IsoTpLink_t g_isotp;
 
@@ -42,18 +39,12 @@ CanRxMsg roll_recv_msg;
 uint8_t roll_tx_data[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
 uint32_t roll_msg_id;
 
-// 回应变量数组定义
-uint8_t resp2[6];
-uint8_t resp3[6];
-uint8_t resp4[6];
-uint8_t resp5[4];
-uint8_t resp6[2];
-
-// 重置服务计时器
-void UDS_Reset_S3_Timer(void)
-{
-    g_s3_server_timer = S3_TIMEOUT_VALUE;
-}
+// UDS回应数组
+uint8_t resp1001[6] = {0x50, 0x01, 0x00, 0x32, 0x01, 0xF4};
+uint8_t resp1002[6] = {0x50, 0x02, 0x00, 0x32, 0x01, 0xF4};
+uint8_t resp1003[6] = {0x50, 0x03, 0x00, 0x32, 0x01, 0xF4};
+uint8_t resp3101[4] = {0x71, 0x01, 0xFF, 0x00};
+uint8_t resp3E[2]   = {0x7E, 0x3E};
 
 // 发送否定响应
 void UDS_Send_NRC(uint8_t sid, uint8_t nrc)
@@ -101,8 +92,6 @@ int main(void)
         // ISO-TP传输层
         if(CAN_RingBuffer_Read(&roll_recv_msg) == 1)
         {
-            // 收到任何有效物理寻址报文，重置服务定时器
-            UDS_Reset_S3_Timer();
 
             if (roll_recv_msg.IDE == CAN_Id_Standard)
             {
@@ -123,7 +112,9 @@ int main(void)
 
         // UDS应用层
         if (g_isotp.state == ISOTP_RX_COMPLETE)
-        {
+        {   
+            // 目前这份代码的逻辑是一帧一帧处理
+
             uint8_t sid = g_isotp.rx_buffer[0];
             uint8_t sub_func = 0;
             uint8_t* p_data = &g_isotp.rx_buffer[1];
@@ -134,7 +125,7 @@ int main(void)
                 sub_func = g_isotp.rx_buffer[1] & 0x7F;
             }
 
-            // 处理UDS服务
+            // 根据UDS服务ID和子功能，处理UDS服务
             switch (sid)
             {   
                 // 处理10服务
@@ -145,43 +136,25 @@ int main(void)
                         // 切换回默认会话， 10 01
                         g_current_session = UDS_SESSION_DEFAULT;
                         g_pre_prog_condition = 0; // 清除权限
-                        
-                        // 肯定响应: 50 01
-						resp2[0] = 0x50;
-                        resp2[1] = 0x01;
-                        resp2[2] = 0x00;
-                        resp2[3] = 0x32;
-                        resp2[4] = 0x01;
-                        resp2[5] = 0xF4;
-                        ISOTP_Transmit_SF(0x7E8, resp2, 6);
+
+                        // 单帧发送，肯定响应
+                        ISOTP_Transmit_SF(0x7E8, resp1001, sizeof(resp1001));
                     }
                     else if (sub_func == UDS_SESSION_EXTENDED)
                     {
                         // 切换到扩展会话， 10 03
                         g_current_session = UDS_SESSION_EXTENDED;
-                        
-                        // 肯定响应: 50 03
-                        resp3[0] = 0x50;
-                        resp3[1] = 0x03;
-                        resp3[2] = 0x00;
-                        resp3[3] = 0x32;
-                        resp3[4] = 0x01;
-                        resp3[5] = 0xF4;
-                        ISOTP_Transmit_SF(0x7E8, resp3, 6);
+
+                        // 单帧发送
+                        ISOTP_Transmit_SF(0x7E8, resp1003, sizeof(resp1003));
                     }
                     else if (sub_func == UDS_SESSION_PROGRAMMING)
                     {
                         // 条件检查，满足条件才进入编程会话，10 02
                         if (g_current_session == UDS_SESSION_EXTENDED && g_pre_prog_condition == 1)
                         {
-                            // 肯定响应: 50 02
-                            resp4[0] = 0x50;
-                            resp4[1] = 0x02;
-                            resp4[2] = 0x00;
-                            resp4[3] = 0x32;
-                            resp4[4] = 0x01;
-                            resp4[5] = 0xF4;
-                            ISOTP_Transmit_SF(0x7E8, resp4, 6);
+                            // 单帧发送
+                            ISOTP_Transmit_SF(0x7E8, resp1002, sizeof(resp1002));
 
                             // 写BKP标志，系统复位进Bootloader
                             BKP_WriteRegister(BKP_FLAG_REGISTER, 0xAaBbCcDd);
@@ -215,16 +188,11 @@ int main(void)
                     // p_data[0] = Type(01), p_data[1]=ID_High, p_data[2]=ID_Low
                     if (p_data[0] == 0x01 && p_data[1] == 0xFF && p_data[2] == 0x00)
                     {
-                        // 执行检查逻辑 (模拟：车速=0，电压>12V)
+                        // 执行检查逻辑
                         g_pre_prog_condition = 1;
-
-                        // 肯定响应: 71 01 FF 00
-                        resp5[0] = 0x71;
-                        resp5[1] = 0x01;
-                        resp5[2] = 0xFF;
-                        resp5[3] = 0x00;
                         
-                        ISOTP_Transmit_SF(0x7E8, resp5, 4);
+                        // 单帧发送
+                        ISOTP_Transmit_SF(0x7E8, resp3101, sizeof(resp3101));
                     }
                     else
                     {
@@ -235,12 +203,9 @@ int main(void)
                 break;
 
                 case 0x3E:
-                {
-                    // 肯定响应: 7E 00
-                    resp6[0] = 0x7E;
-                    resp6[1] = 0x00;
-                    
-                    ISOTP_Transmit_SF(0x7E8, resp6, 2);
+                {                    
+                    // 单帧发送
+                    ISOTP_Transmit_SF(0x7E8, resp3E, sizeof(resp3E));
                 }
                 break;
 
@@ -249,7 +214,8 @@ int main(void)
                     UDS_Send_NRC(sid, 0x11);
                     break;
             }
-            // 重置ISO-TP状态，准备接收下一个报文
+
+            // 处理完毕，重新初始化ISO-TP状态机
             ISOTP_Init();
         }
         else if (g_isotp.state == ISOTP_RX_ERROR)

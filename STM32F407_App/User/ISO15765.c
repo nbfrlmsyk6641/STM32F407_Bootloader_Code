@@ -54,7 +54,7 @@ void ISOTP_Transmit_SF(uint32_t id, uint8_t* data, uint8_t len)
     CAN1_Transmit_TX(id, 8, tx_data);
 }
 
-// 接收处理函数
+// 接收处理函数，在这个处理逻辑中，如果是基础的UDS服务就取出一帧处理一帧，如果是数据传输UDS服务则会组包，组包后再处理
 void ISOTP_Receive_Handler(CanRxMsg *msg)
 {
     uint8_t pci_type;
