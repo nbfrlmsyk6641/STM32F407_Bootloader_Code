@@ -1,4 +1,4 @@
-# include "ISO15765.h"
+#include "ISO15765.h"
 #include <string.h>
 
 // 定义上下文对象
@@ -18,8 +18,8 @@ static void ISOTP_Send_FC(void)
     // Byte 1: BS (Block Size) = 0 (不分块，一次发完)
     tx_data[1] = 0x00; 
     
-    // Byte 2: STmin (最小间隔) = 2ms 
-    tx_data[2] = 0x02; 
+    // Byte 2: STmin (最小间隔) = 5ms 
+    tx_data[2] = 0x05; 
     
     // 发送报文
     CAN1_Transmit_TX(ISOTP_TX_ID, 8, tx_data);
@@ -54,7 +54,7 @@ void ISOTP_Transmit_SF(uint32_t id, uint8_t* data, uint8_t len)
     CAN1_Transmit_TX(id, 8, tx_data);
 }
 
-// 接收处理函数
+// 接收处理函数，在这个处理逻辑中，如果是基础的UDS服务就取出一帧处理一帧，如果是数据传输UDS服务则会组包，组包后再处理
 void ISOTP_Receive_Handler(CanRxMsg *msg)
 {
     uint8_t pci_type;
@@ -95,11 +95,11 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
         // Case B: 首帧 (FF - First Frame) -> 0x10
         // ---------------------------------------------------------
         case ISOTP_FRAME_FF:
-            // 解析总长度 (Byte0 低4位 + Byte1)
+            // 解析总长度 (Byte0 低4位 + Byte1)，这里的总长度是一块的总长度不是固件总长度
             // 例如: 10 80 -> 0x080 = 128 字节
             g_isotp.rx_total_len = ((msg->Data[0] & 0x0F) << 8) | msg->Data[1];
             
-            // 保护：如果数据太大，超过了我们要开辟的 4KB RAM，必须报错
+            // 保护：如果数据太大，超过了要开辟的 4KB RAM，必须报错
             if (g_isotp.rx_total_len > ISOTP_MAX_BUF_SIZE)
             {
                 g_isotp.state = ISOTP_RX_ERROR;

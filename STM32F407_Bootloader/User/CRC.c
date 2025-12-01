@@ -5,7 +5,7 @@ uint32_t IAP_Software_Calculate_CRC(const uint8_t * pData, uint32_t uiDataSize)
     uint32_t i_index;
     uint32_t j_index;
     uint32_t uiCrc = 0xFFFFFFFF; // 1. 初始值
-    //const uint32_t uiPolynomial = 0x04C11DB7; // (这是一个反转的多项式，用于匹配Reflect In/Out)
+    //const uint32_t uiPolynomial = 0x04C11DB7;
 
     for (i_index = 0; i_index < uiDataSize; i_index++)
     {
@@ -31,7 +31,7 @@ uint32_t IAP_Software_Calculate_CRC(const uint8_t * pData, uint32_t uiDataSize)
 
 uint32_t IAP_Calculate_CRC_On_Flash(uint32_t start_address, uint32_t size_in_bytes)
 {
-    // 1. (重要!) 确保CRC时钟是关闭的，我们不再需要它
+    // 1. 确保CRC时钟是关闭的
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, DISABLE);
     
     // 2. 将 Flash 地址 (一个指针) 和 大小 传递给软件CRC函数

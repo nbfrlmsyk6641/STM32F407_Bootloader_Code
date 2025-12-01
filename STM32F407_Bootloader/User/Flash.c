@@ -103,9 +103,12 @@ void FLASH_WriteHalfWord(uint32_t Address, uint16_t Data)
 FLASH_Status FLASH_Write_Buffer(uint32_t Address, uint16_t* pData, uint16_t Count)
 {
     FLASH_Status flash_status = FLASH_COMPLETE;
+
     uint16_t i = 0;
 
     FLASH_Unlock();
+
+    // FLASH_ClearFlag(FLASH_FLAG_EOP | FLASH_FLAG_OPERR | FLASH_FLAG_WRPERR | FLASH_FLAG_PGAERR | FLASH_FLAG_PGPERR | FLASH_FLAG_PGSERR);
 
     for(i = 0; (i < Count) && (flash_status == FLASH_COMPLETE); i++)
     {
@@ -198,6 +201,8 @@ uint8_t IAP_Erase_App_Sectors(uint32_t firmware_size)
     __enable_irq();
     return 0; // 所有相关扇区均擦除成功
 }
+
+
 
 
 

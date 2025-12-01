@@ -11,6 +11,7 @@
 #include "BKP.h"
 #include "CRC.h"
 #include "ISO15765.h"
+#include <string.h>
 
 #endif /* __MAIN_H */
 

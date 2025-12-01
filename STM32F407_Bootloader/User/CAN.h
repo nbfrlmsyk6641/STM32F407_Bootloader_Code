@@ -11,7 +11,7 @@ typedef struct {
     volatile uint16_t tail;                
 } RingBuffer_t;
 
-// ... 函数声明 ...
+// 函数声明
 uint8_t CAN_RingBuffer_Read(CanRxMsg* msg);
 void CAN_1_Init(void);
 uint8_t CAN1_Transmit_TX(uint32_t ID, uint8_t Length, uint8_t *Data);

@@ -8,63 +8,34 @@
 // ISO-TP接收上下文对象
 extern IsoTpLink_t g_isotp;
 
-// 定义软件更新状态机枚举变量
-typedef enum 
-{
-    IAP_STATE_IDLE,             // 0: 空闲 
-    IAP_STATE_START,            // 1: IAP启动，发送“准备就绪”
-    IAP_STATE_WAIT_METADATA,    // 2: 等待上位机发送元数据 (0xC1)
-    IAP_STATE_ERASE_FLASH,      // 3: 正在擦除Flash
-    IAP_STATE_WAIT_DATA,        // 4: 等待固件数据包 (0xC2)
-    IAP_STATE_WAIT_EOT,         // 5: 等待传输结束指令 (0xC3)
-    IAP_STATE_VERIFY,           // 6: 正在执行CRC校验
-    IAP_STATE_SUCCESS,          // 7: 更新成功，准备重启
-    IAP_STATE_FAILURE           // 8: 更新失败，等待重试
-} IAP_State_t;
-
 // 环形缓冲器接收变量
 CanRxMsg roll_recv_msg;
 
-// 无升级时发送的报文变量
-uint32_t Normal_TxID = 0xB0;
-uint8_t Normal_TxLength = 8;
-uint8_t Normal_TxData[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+// UDS服务应答数组(肯定应答)
+uint8_t resp1002[6] = {0x50, 0x02, 0x00, 0x32, 0x01, 0xF4};
+uint8_t resp34[4] = {0x74, 0x20, 0x10, 0x00};
+uint8_t pending[3] = {0x7F, 0x31, 0x78};
+uint8_t resp31[4] = {0x71, 0x01, 0xFF, 0x00};
+uint8_t resp36[2] = {0x76, 0xFF};
+uint8_t resp37[1] = {0x77};
 
-// 有升级时发送的报文变量
+// UDS服务应答数组(否定应答)
+uint8_t resp_31fail[3] = {0x7F, 0x31, 0x31};
+uint8_t resp_36fail[3] = {0x7F, 0x36, 0x72};
+uint8_t resp_37fail[3] = {0x7F, 0x37, 0x72};
+uint8_t resp_fail[3] = {0x7F, 0x00, 0x11};
 
-// 应答上位机的报文，确认存在升级请求
-uint32_t Boot_Confirm_TxID = 0xB0;
-uint8_t Boot_Confirm_TxLength = 8;
-uint8_t Boot_Confirm_TxData[8] = {0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22, 0x22};
+// 简化版状态机
+typedef enum {
+    STATE_IDLE,
+    STATE_ERASED,
+    STATE_WRITING
+} Boot_State_t;
 
-// 应答上位机的报文，答复Flash已擦除
-uint32_t Boot_Erase_TxID = 0xB1;
-uint8_t Boot_Erase_TxLength = 8;
-uint8_t Boot_Erase_TxData[8] = {0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33, 0x33};
-
-// 应答上位机的报文，通知收到一帧数据包
-uint32_t Boot_DataAck_TxID = 0xB2;
-uint8_t Boot_DataAck_TxLength = 8;
-uint8_t Boot_DataAck_TxData[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-// 应答上位机的报文，通知更新成功
-uint32_t Boot_Success_TxID = 0xB3;
-uint8_t Boot_Success_TxLength = 8;
-uint8_t Boot_Success_TxData[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
-
-// 应答上位机的报文，通知更新失败，准备重试
-uint32_t Boot_Error_TxID = 0xB4;
-uint8_t Boot_Error_TxLength = 8;
-uint8_t Boot_Error_TxData[8] = {0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44, 0x44};
+Boot_State_t boot_state = STATE_IDLE;
 
 // IAP标志位
 uint8_t IAP_Flag = 0;
-
-// IAP状态机
-IAP_State_t g_iap_state = IAP_STATE_IDLE;
-
-// IAP计数变量
-uint8_t IAP_Timeout_Counter = 0;
 
 // BKP变量
 uint32_t BKP_Data = 0;
@@ -74,15 +45,19 @@ uint32_t g_firmware_total_size = 0;
 uint32_t g_firmware_total_crc = 0;
 uint32_t g_firmware_bytes_received = 0;
 uint8_t  g_expected_packet_num = 0;
-uint16_t data_to_write[3];
+uint16_t data_to_write[2050];
 uint32_t write_addr = 0;
 uint8_t last_ack_num = 0;
+uint8_t block_seq = 0;
+uint8_t* fw_data = NULL;
+uint16_t fw_len = 0;
+uint16_t temp_halfword;
 
 // CRC校验变量
 uint32_t local_crc = 0;
-uint32_t g_debug_failed_crc = 0;
 
-uint8_t i;
+uint32_t i;
+uint32_t j;
 
 int main(void)
 {
@@ -106,6 +81,9 @@ int main(void)
     {
         // 不存在升级请求，准备执行5s初始化后进App
         IAP_Flag = 0;
+
+        // BKP也清零
+        BKP_WriteRegister(BKP_FLAG_REGISTER, 0x00000000);
     }
 
     if (IAP_Flag == 0)
@@ -130,9 +108,6 @@ int main(void)
             {
                 // 5s等待过程中
                 Clear_Task3_Flag();
-
-                // 每1s发送一帧CAN报文
-                CAN1_Transmit_TX(Normal_TxID, Normal_TxLength, Normal_TxData);
             }
 
             if(Get_Task2_Flag() == 1)
@@ -140,6 +115,7 @@ int main(void)
                 // 5秒等待结束，无任何特殊请求，跳转到App
                 Clear_Task2_Flag();
 
+                // 跳转进App
                 Jump_To_Application();
             }
         }
@@ -153,9 +129,6 @@ int main(void)
         CAN_1_Init();
         ISOTP_Init();
 
-        // 进入IAP状态机，启动IAP流程
-        g_iap_state = IAP_STATE_START;
-
         while(1)
         {
             // CAN报文接收缓冲
@@ -166,23 +139,12 @@ int main(void)
             // LED闪烁，指示正在运行IAP
             if(Get_Task1_Flag() == 1)
             {
-                // 5s等待过程中
                 Clear_Task1_Flag();
 
-                // 持续闪烁LED且频率高于App的LED闪烁频率
                 GPIO_ToggleBits(GPIOE, GPIO_Pin_13);
             }
 
-            // IAP超时计数
-            if(Get_Task3_Flag() == 1)
-            {
-                // 1s计数
-                Clear_Task3_Flag();
-
-                IAP_Timeout_Counter++;
-            }
-
-            // CAN报文接收
+            // 取出CAN报文,ISO-TP协议处理报文
             if(CAN_RingBuffer_Read(&roll_recv_msg) == 1)
             {
                 rx_id = roll_recv_msg.StdId;
@@ -190,7 +152,8 @@ int main(void)
                 rx_len = roll_recv_msg.DLC;
 
                 for (i = 0; i < rx_len; i++)
-                {
+                {   
+                    // 取出收到的数据，这一步可有可无
                     rx_data[i] = roll_recv_msg.Data[i];
                 }
 
@@ -202,253 +165,196 @@ int main(void)
             }
             else
             {   
-                // 无报文接收，清一下ID，避免干扰状态机
+                // 无报文接收，清一下变量，避免干扰状态机
                 rx_id = 0;
+                rx_len = 0;
+                memset(rx_data, 0, sizeof(rx_data));
             }
 
-            // 判断协议是否处理完数据包
+            // CAN报文处理完毕，执行对应UDS服务
             if (g_isotp.state == ISOTP_RX_COMPLETE)
             {
-                // 获取服务 ID (SID) - UDS 数据的第 1 个字节
                 uint8_t sid = g_isotp.rx_buffer[0];
+                uint8_t sub_func = 0;
+                uint8_t* p_data = &g_isotp.rx_buffer[1];
+                uint16_t data_len = g_isotp.rx_total_len - 1;
 
-                if (sid == 0x10) 
+                // 取出子功能，34服务没有子功能，就不用解析
+                if (g_isotp.rx_total_len > 1 && sid != 0x34)
                 {
-                    GPIO_ToggleBits(GPIOE, GPIO_Pin_13); 
+                    sub_func = g_isotp.rx_buffer[1] & 0x7F;
                 }
 
-                ISOTP_Init(); 
-            }   
-            else if (g_isotp.state == ISOTP_RX_ERROR)
-            {
-                // 发生传输错误，复位协议，等待重传
-                ISOTP_Init();
-            }
-
-            // IAP状态机处理流程
-            switch (g_iap_state)
-            {
-                // 状态1: IAP启动，发送“准备就绪”
-                case IAP_STATE_START:
-
-                    // 发送“Bootloader就绪”报文 (0xB0)，通知上位机
-                    CAN1_Transmit_TX(Boot_Confirm_TxID, Boot_Confirm_TxLength, Boot_Confirm_TxData);
-                    
-                    // 立即切换到下一个状态：等待固件数据
-                    g_iap_state = IAP_STATE_WAIT_METADATA;
-                    
-                    // 重置超时计数器
-                    IAP_Timeout_Counter = 0;
-                    
-                    break;
-
-                // 状态2: 等待上位机发送固件数据 (0xC1)
-                case IAP_STATE_WAIT_METADATA:
-
-                    if (rx_id == 0xC1 && rx_len == 8) // ID 0xC1
+                // 开始处理UDS服务
+                switch (sid)
+                {
+                    // 重启进Bootloader后会再来一次10 02，确认进入Bootloader
+                    case 0x10:
                     {
-                        // 1. 解包固件大小和CRC校验码
-                        g_firmware_total_size = (uint32_t)rx_data[0] |
-                                                (uint32_t)(rx_data[1] << 8) |
-                                                (uint32_t)(rx_data[2] << 16) |
-                                                (uint32_t)(rx_data[3] << 24);
-                                        
-                        g_firmware_total_crc =  (uint32_t)rx_data[4] |
-                                                (uint32_t)(rx_data[5] << 8) |
-                                                (uint32_t)(rx_data[6] << 16) |
-                                                (uint32_t)(rx_data[7] << 24);
+                        if (sub_func == 0x02)
+                        {
+                            // 肯定应答
+                            ISOTP_Transmit_SF(0x7E8, resp1002, sizeof(resp1002));
 
-                        // 2. 校验大小
-                        if (g_firmware_total_size == 0 || g_firmware_total_size > (300 * 1024))
-                        {
-                            // 固件太大或为0，校验失败，进入错误状态
-                            g_iap_state = IAP_STATE_FAILURE;
-                        }
-                        else
-                        {
-                            // 校验成功，进入擦除状态
-                            g_iap_state = IAP_STATE_ERASE_FLASH;
+                            // 状态机
+                            boot_state = STATE_IDLE;
                         }
                     }
-                    else if (IAP_Timeout_Counter >= 10)
-                    {
-                        // 超过10秒未收到固件数据，进入错误状态
-                        g_iap_state = IAP_STATE_FAILURE;
-                    }
-
                     break;
-                    
-                // 状态3: 根据固件大小擦除Flash
-                case IAP_STATE_ERASE_FLASH: 
-                    
-                    if (IAP_Erase_App_Sectors(g_firmware_total_size) == 0)
-                    {
-                        // 擦除成功，发送“擦除完毕”响应 (0xB1)至上位机
-                        CAN1_Transmit_TX(Boot_Erase_TxID, Boot_Erase_TxLength, Boot_Erase_TxData);
-                        
-                        // 切换到下一个状态
+
+                    // 34服务，下载请求，解析上位机发来的固件信息：固件大小、CRC32校验码
+                    case 0x34:
+                    {   
+                        // 解析固件大小
+                        g_firmware_total_size = (uint32_t)p_data[0] | ((uint32_t)p_data[1] << 8) | ((uint32_t)p_data[2] << 16) | ((uint32_t)p_data[3] << 24);
+
+                        // 解析CRC32校验码
+                        g_firmware_total_crc = (uint32_t)p_data[4] | ((uint32_t)p_data[5] << 8) | ((uint32_t)p_data[6] << 16) | ((uint32_t)p_data[7] << 24);
+
+                        // 清空固件计数准备进行接收，必须清空，不然后续地址计算会错
                         g_firmware_bytes_received = 0;
-                        g_expected_packet_num = 0;
-                        g_iap_state = IAP_STATE_WAIT_DATA;
-                        IAP_Timeout_Counter = 0; 
-                    }
-                    else
-                    {
-                        // 擦除失败
-                        g_iap_state = IAP_STATE_FAILURE;
-                    }
 
+                        // 应答上位机
+                        ISOTP_Transmit_SF(0x7E8, resp34, sizeof(resp34));
+
+                        // 状态机
+                        boot_state = STATE_IDLE;
+                    }
                     break;
-                    
-                // 状态4: 等待固件数据包，并将数据写入Flash
-                case IAP_STATE_WAIT_DATA:
 
-                    if(rx_id == 0xC2 && rx_len == 8)
+                    // 31服务，Flash擦除请求，进行Flash擦除
+                    case 0x31:
                     {
-                        if(rx_data[0] != 0xAA)
+                        if (sub_func == 0x01)
                         {
-                            // 数据包起始标志错误，进入错误状态
-                            g_iap_state = IAP_STATE_FAILURE;
-                            break;
+                            if (p_data[1] == 0xFF && p_data[2] == 0x00)
+                            {
+                                // 回复上位机
+                                ISOTP_Transmit_SF(0x7E8, pending, sizeof(pending));
+
+                                // 根据固件大小擦除Flash
+                                if (IAP_Erase_App_Sectors(g_firmware_total_size) == 0)
+                                {
+                                    // 擦除成功，回复肯定应答
+                                    ISOTP_Transmit_SF(0x7E8, resp31, sizeof(resp31));
+
+                                    // 状态机
+                                    boot_state = STATE_ERASED;
+                                }
+                                else
+                                {
+                                    ISOTP_Transmit_SF(0x7E8, resp_31fail, sizeof(resp_31fail));
+                                }
+                            }
                         }
+                    }
+                    break;
 
-                        if(rx_data[1] == g_expected_packet_num)
-                        {   
-                            // 1. 重置超时计数器
-                            IAP_Timeout_Counter = 0;
+                    // 36服务，固件数据传输服务
+                    case 0x36:
+                    {
+                        if (boot_state == STATE_ERASED || boot_state == STATE_WRITING)
+                        {
+                            // 状态机
+                            boot_state = STATE_WRITING;
 
-                            // 2. 从数据包中拆出要写入的6个字节
-                            data_to_write[0] = (uint16_t)rx_data[2] | ((uint16_t)rx_data[3] << 8);
-                            data_to_write[1] = (uint16_t)rx_data[4] | ((uint16_t)rx_data[5] << 8);
-                            data_to_write[2] = (uint16_t)rx_data[6] | ((uint16_t)rx_data[7] << 8);
+                            // 处理固件信息
+                            block_seq = p_data[0];
+                            fw_data = &p_data[1];
+                            fw_len = data_len - 1;
 
-                            // 3. 计算写入地址
+                            // 计算Flash写入地址
                             write_addr = APPLICATION_START_ADDRESS + g_firmware_bytes_received;
 
-                            // 4. 写入Flash
-                            if (FLASH_Write_Buffer(write_addr, data_to_write, 3) == FLASH_COMPLETE)
+                            // 准备要写入的数据
+                            for (j = 0; j < (fw_len / 2); j++)
                             {
-                                // 5. 写入成功，发送应答报文至上位机
-                                Boot_DataAck_TxData[0] = g_expected_packet_num; // 将序列号放入ACK报文
-                                CAN1_Transmit_TX(Boot_DataAck_TxID, Boot_DataAck_TxLength, Boot_DataAck_TxData);
-                                
-                                // 6. 更新计数变量状态
-                                g_expected_packet_num ++; // 期待下一个包 (0-255 自动回绕)
-                                g_firmware_bytes_received += 6; // 每包固定传输6字节
-                                
-                                // 7. 检查是否全部完成
-                                //    (注意：这里用 >= 是为了处理最后
-                                //     一包 host 补 0xFF 的情况)
-                                if (g_firmware_bytes_received >= g_firmware_total_size)
-                                {
-                                    // 所有数据包已接收完毕
-                                    g_iap_state = IAP_STATE_WAIT_EOT;
-                                    IAP_Timeout_Counter = 0; // 重置超时，准备等待EOT
-                                }
+                                temp_halfword = (uint16_t)fw_data[2 * j] | ((uint16_t)fw_data[2 * j + 1] << 8);
+                                data_to_write[j] = temp_halfword;
+                            }
+
+                            if (fw_len % 2 != 0)
+                            {
+                                temp_halfword = (uint16_t)fw_data[fw_len - 1] | ((uint16_t)0xFF << 8);
+                                data_to_write[fw_len / 2] = temp_halfword;
+                            }
+
+                            // 关中断
+                            __disable_irq();
+        
+                            if (FLASH_Write_Buffer(write_addr, data_to_write, (fw_len + 1) / 2) == FLASH_COMPLETE)
+                            {
+                                // 开中断
+                                __enable_irq();
+
+                                g_firmware_bytes_received += fw_len;
+
+                                resp36[1] = block_seq;
+
+                                // 写入成功，发送肯定应答
+                                ISOTP_Transmit_SF(0x7E8, resp36, 2);
                             }
                             else
                             {
-                                // Flash 写入失败
-                                g_iap_state = IAP_STATE_FAILURE;
+                                // 开中断
+                                __enable_irq();
+                                
+                                resp_36fail[2] = 0x72;
+
+                                // 写入失败，发送否定应答
+                                ISOTP_Transmit_SF(0x7E8, resp_36fail, sizeof(resp_36fail));
                             }
                         }
-                        else if (rx_data[1] < g_expected_packet_num) // 收到一个重复的旧包
+                        else
                         {
-                            // 1. 重置超时
-                            IAP_Timeout_Counter = 0;
-                            
-                            // 2. 重新发送上一个的ACK
-                            last_ack_num = (g_expected_packet_num == 0) ? 0xFF : (g_expected_packet_num - 1);
-                            Boot_DataAck_TxData[0] = last_ack_num;
-                            CAN1_Transmit_TX(Boot_DataAck_TxID, Boot_DataAck_TxLength, Boot_DataAck_TxData);
+                            resp_36fail[2] = 0x24;
+
+                            // 未擦除Flash就写入，发送否定应答
+                            ISOTP_Transmit_SF(0x7E8, resp_36fail, sizeof(resp_36fail));
                         }
                     }
-                    else if (IAP_Timeout_Counter >= 5) // 5秒超时
+                    break;
+
+                    // 37服务，CRC32本地校验
+                    case 0x37:
+                    {   
+                        // 本地软件校验CRC
+                        local_crc = IAP_Calculate_CRC_On_Flash(APPLICATION_START_ADDRESS, g_firmware_total_size);
+
+                        // 对比CRC
+                        if (local_crc == g_firmware_total_crc)
+                        {
+                            // 校验成功，发送肯定应答
+                            ISOTP_Transmit_SF(0x7E8, resp37, sizeof(resp37));
+
+                            // 重启系统
+                            NVIC_SystemReset();
+                        }
+                        else
+                        {
+                            // 校验失败，发送否定应答
+                            ISOTP_Transmit_SF(0x7E8, resp_37fail, sizeof(resp_37fail));
+                        }
+
+                    }
+                    break;
+
+                    default:
                     {
-                        g_iap_state = IAP_STATE_FAILURE;
+                        resp_fail[1] = sid;
+                        ISOTP_Transmit_SF(0x7E8, resp_fail, sizeof(resp_fail));
                     }
 
-                    break;
-                    
-                // 状态5: 等待上位机指示传输结束 (0xC3)
-                case IAP_STATE_WAIT_EOT:
+                }
 
-                    if(rx_id == 0xC3 && rx_len == 8 && rx_data[0] == 0xBB) // 0xBB 是EOT包头
-                    {
-                        IAP_Timeout_Counter = 0;
-                        g_iap_state = IAP_STATE_VERIFY; // 进入校验状态
-                    }
-                    else if (IAP_Timeout_Counter >= 5) // 5秒EOT超时
-                    {
-                        g_iap_state = IAP_STATE_FAILURE;
-                    }
-
-                    break;
-                    
-                // 状态6: 执行CRC校验
-                case IAP_STATE_VERIFY:
-
-                    // 1. 调用硬件CRC计算Flash中的固件
-                    local_crc = IAP_Calculate_CRC_On_Flash(APPLICATION_START_ADDRESS, g_firmware_total_size);
-                    
-                    // 2. 对比CRC
-                    if (local_crc == g_firmware_total_crc)
-                    {
-                        // 校验成功！
-                        g_iap_state = IAP_STATE_SUCCESS;
-                    }
-                    else
-                    {
-                        // 校验失败！
-                        g_debug_failed_crc = local_crc;
-                        g_iap_state = IAP_STATE_FAILURE;
-                    }
-
-                    break;
-                    
-                // 状态7: 更新成功
-                case IAP_STATE_SUCCESS:
-
-                    // 1. 发送最终成功报文 (0xB3)
-                    CAN1_Transmit_TX(Boot_Success_TxID, Boot_Success_TxLength, Boot_Success_TxData);
-                    
-                    // 2. 软件复位系统，进入新App
-                    NVIC_SystemReset();
-
-                    break;
-                    
-                // 状态8: 更新失败 (CRC错误或大小错误)
-                case IAP_STATE_FAILURE:
-
-                    // 通知上位机更新失败，并准备好重试
-
-                    // 按小端模式打包 (匹配Python的 <I )
-                    Boot_Error_TxData[0] = (uint8_t)(g_debug_failed_crc);
-                    Boot_Error_TxData[1] = (uint8_t)(g_debug_failed_crc >> 8);
-                    Boot_Error_TxData[2] = (uint8_t)(g_debug_failed_crc >> 16);
-                    Boot_Error_TxData[3] = (uint8_t)(g_debug_failed_crc >> 24);
-                    
-                    // (你也可以把Python期望的CRC放在后4字节)
-                    Boot_Error_TxData[4] = (uint8_t)(g_firmware_total_crc);
-                    Boot_Error_TxData[5] = (uint8_t)(g_firmware_total_crc >> 8);
-                    Boot_Error_TxData[6] = (uint8_t)(g_firmware_total_crc >> 16);
-                    Boot_Error_TxData[7] = (uint8_t)(g_firmware_total_crc >> 24);
-                
-                    CAN1_Transmit_TX(Boot_Error_TxID, Boot_Error_TxLength, Boot_Error_TxData);
-
-                    // 切换回等待固件数据状态，以便上位机重新发起流程
-                    g_iap_state = IAP_STATE_START;
-                    IAP_Timeout_Counter = 0;
-
-                    break;
-
-                // 默认状态 (异常处理)
-                default:
-                    // 发生了未知状态，重置流程
-                    g_iap_state = IAP_STATE_FAILURE;
-                    break;
-
-            } // end switch
+                // 清空接收状态，准备接收下一个报文
+                ISOTP_Init();
+            }
+            else if (g_isotp.state == ISOTP_RX_ERROR)
+            {
+                // 出现接收错误，重置接收状态
+                ISOTP_Init();
+            }            
         }
     }
 }
