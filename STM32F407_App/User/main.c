@@ -29,11 +29,6 @@ uint8_t sub_func;
 uint8_t ISO_resp_data[2];
 uint32_t current_id;
 
-// 定义周期性发送报文变量
-uint32_t Cyc_TxID = 0x001;
-uint8_t Cyc_TxLength = 8;
-uint8_t Cyc_TxData[8] = {0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11};
-
 // 定义环形缓冲器变量
 CanRxMsg roll_recv_msg;
 uint8_t roll_tx_data[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};

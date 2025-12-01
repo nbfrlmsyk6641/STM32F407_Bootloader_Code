@@ -74,7 +74,7 @@ int main(void)
         // BKP清零
         BKP_WriteRegister(BKP_FLAG_REGISTER, 0x00000000);
 
-        // 存在升级请求
+        // 存在升级请求，准备走IAP流程
         IAP_Flag = 1;
     }
     else
@@ -298,7 +298,7 @@ int main(void)
                             {
                                 // 开中断
                                 __enable_irq();
-                                
+
                                 resp_36fail[2] = 0x72;
 
                                 // 写入失败，发送否定应答
