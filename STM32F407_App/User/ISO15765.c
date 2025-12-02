@@ -1,11 +1,11 @@
-# include "ISO15765.h"
+#include "ISO15765.h"
 #include <string.h>
-
-// 定义上下文对象
-IsoTpLink_t g_isotp;
 
 // MCU端发送至诊断设备的CAN ID
 #define ISOTP_TX_ID   0x7E8
+
+// 定义上下文对象
+static IsoTpLink_t g_isotp;
 
 // 流控帧发送函数，流控帧格式：30 + BS + STmin
 static void ISOTP_Send_FC(void)
@@ -25,7 +25,7 @@ static void ISOTP_Send_FC(void)
     CAN1_Transmit_TX(ISOTP_TX_ID, 8, tx_data);
 }
 
-// 协议初始化函数
+// 协议初始化函数也是状态重置函数
 void ISOTP_Init(void)
 {
     g_isotp.state = ISOTP_IDLE;
@@ -166,3 +166,31 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             break;
     }
 }
+
+// 传递变量的接口函数
+
+// ISO-TP处理状态查询接口函数
+uint8_t ISOTP_IsReceiveComplete(void)
+{
+    return (g_isotp.state == ISOTP_RX_COMPLETE) ? 1 : 0;
+}
+
+// ISO-TP错误状态查询接口函数
+uint8_t ISOTP_IsError(void)
+{
+    return (g_isotp.state == ISOTP_RX_ERROR) ? 1 : 0;
+}
+
+// ISO-TP接收数据地址接口函数
+uint8_t* ISOTP_GetRxBuffer(void)
+{
+    return g_isotp.rx_buffer;
+}
+
+// ISO-TP接收数据长度接口函数
+uint16_t ISOTP_GetRxLength(void)
+{
+    return g_isotp.rx_total_len;
+}
+
+

@@ -6,6 +6,7 @@
 #define LED1_OFF 		GPIO_SetBits(GPIOE , GPIO_Pin_13)
 
 void LED_GPIO_Config(void);
+void LED_Task(void);
 
 #endif
 

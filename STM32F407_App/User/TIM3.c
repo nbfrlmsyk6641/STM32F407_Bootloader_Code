@@ -51,16 +51,28 @@ void TIM3_IRQHandler(void)
     {
         Time_Count ++;
 
-        // 每0.2秒翻转一次LED，并发送一帧CAN报文
-        if(Time_Count >= 2)
+        // 每2秒翻转一次LED，并发送一帧CAN报文
+        if(Time_Count >= 20)
         {
             Time_Count = 0;
 
-            // 设置1秒标志位
+            // 设置标志位
             g_timer_1s_flag = 1;
         }
 
         // 清除中断标志
         TIM_ClearITPendingBit(TIM3, TIM_IT_Update);
     }
+}
+
+// 中断标志位接口函数
+uint8_t TIM3_GetTimeFlag(void)
+{
+    return g_timer_1s_flag;
+}
+
+// 中断标志位清除函数
+void TIM3_ClearTimeFlag(void)
+{
+    g_timer_1s_flag = 0;
 }

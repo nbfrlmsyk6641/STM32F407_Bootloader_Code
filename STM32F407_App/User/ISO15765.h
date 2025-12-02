@@ -46,6 +46,10 @@ typedef struct {
 void ISOTP_Init(void);
 void ISOTP_Receive_Handler(CanRxMsg *msg);
 void ISOTP_Transmit_SF(uint32_t id, uint8_t* data, uint8_t len);
+uint8_t ISOTP_IsReceiveComplete(void);
+uint8_t ISOTP_IsError(void);
+uint8_t* ISOTP_GetRxBuffer(void);
+uint16_t ISOTP_GetRxLength(void);
 
 #endif /* __ISO15765_H */
 

@@ -1,5 +1,6 @@
 #include "main.h"
 
+// LED硬件初始化
 void LED_GPIO_Config(void)
 {
 
@@ -14,5 +15,17 @@ void LED_GPIO_Config(void)
 
 	/*初始化完后，关闭LED1*/ 
 	LED1_OFF;
+}
+
+// LED闪烁任务
+void LED_Task(void)
+{
+	if (TIM3_GetTimeFlag() == 1)
+	{
+		TIM3_ClearTimeFlag();
+		
+		// 翻转LED1状态
+		GPIO_ToggleBits(GPIOE, GPIO_Pin_13);
+	}
 }
 
