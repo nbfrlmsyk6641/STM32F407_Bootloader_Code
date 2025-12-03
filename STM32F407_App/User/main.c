@@ -36,6 +36,9 @@ int main(void)
 
 		// ISO15765超时机制
 		ISOTP_Timer_NCr();
+
+		// ISO15765错误机制
+		ISOTP_ErrorStatus();
     }
 	
 }

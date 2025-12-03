@@ -46,6 +46,10 @@ typedef struct {
     // --- 网络层定时参数 ---
     uint32_t  timer_ncr;
 
+    // --- 流控帧变量 ---
+    uint8_t  block_size;
+    uint8_t  bs_counter;
+
 } IsoTpLink_t;
 
 // 函数声明
@@ -57,6 +61,7 @@ uint8_t ISOTP_IsError(void);
 uint8_t* ISOTP_GetRxBuffer(void);
 uint16_t ISOTP_GetRxLength(void);
 void ISOTP_Timer_NCr(void);
+void ISOTP_ErrorStatus(void);
 
 #endif /* __ISO15765_H */
 

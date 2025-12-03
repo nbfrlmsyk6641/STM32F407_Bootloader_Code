@@ -15,14 +15,20 @@ static void ISOTP_Send_FC(void)
     // Byte 0: PCI=0x30 (FC类型), 低4位 FS=0 (CTS, 继续发送)
     tx_data[0] = 0x30; 
     
-    // Byte 1: BS (Block Size) = 0 (不分块，一次发完)
-    tx_data[1] = 0x00; 
+    // Byte 1: BS (Block Size)一个块分多少帧发
+    tx_data[1] = g_isotp.block_size; 
     
     // Byte 2: STmin (最小间隔) = 5ms 
     tx_data[2] = 0x05; 
     
     // 发送报文
     CAN1_Transmit_TX(ISOTP_TX_ID, 8, tx_data);
+
+    // 发完FC清计数（因为发送一次FC就意味着要准备收下一轮数据）
+    g_isotp.bs_counter = 0;
+
+    // NCr重置
+    g_isotp.timer_ncr = ISOTP_TIMEOUT_NCR;
 }
 
 // 协议初始化函数也是状态重置函数
@@ -119,11 +125,10 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             
             // 切换状态：等待连续帧
             g_isotp.state = ISOTP_RX_WAIT_CF;
-
-            g_isotp.timer_ncr = ISOTP_TIMEOUT_NCR;
             
             // 发送流控帧 (FC)，告诉上位机可以开始发包
             ISOTP_Send_FC();
+
             break;
 
         // ---------------------------------------------------------
@@ -143,6 +148,7 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
                 return;
             }
 
+            // 获取到了连续帧，重置NCr
             g_isotp.timer_ncr = ISOTP_TIMEOUT_NCR;
             
             // 计算本次要复制多少字节
@@ -159,6 +165,16 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             
             // 更新期望的下一个 SN (0-15 循环)
             g_isotp.expected_sn = (g_isotp.expected_sn + 1) % 16;
+
+            if (g_isotp.block_size > 0)
+            {
+                g_isotp.bs_counter ++;
+
+                if (g_isotp.bs_counter >= g_isotp.block_size)
+                {
+                    ISOTP_Send_FC();
+                }
+            }
             
             // 检查是否接收完毕
             if (g_isotp.rx_count >= g_isotp.rx_total_len)
@@ -211,5 +227,13 @@ void ISOTP_Timer_NCr(void)
         {
             g_isotp.state = ISOTP_RX_ERROR;
         }
+    }
+}
+
+void ISOTP_ErrorStatus(void)
+{
+    if (g_isotp.state == ISOTP_RX_ERROR)
+    {
+        ISOTP_Init();
     }
 }
