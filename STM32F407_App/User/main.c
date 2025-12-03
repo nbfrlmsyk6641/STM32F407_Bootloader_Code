@@ -33,6 +33,9 @@ int main(void)
 
         // UDS应用层
         UDS_Process();
+
+		// ISO15765超时机制
+		ISOTP_Timer_NCr();
     }
 	
 }

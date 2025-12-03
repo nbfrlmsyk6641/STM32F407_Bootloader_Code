@@ -1,7 +1,7 @@
 #include "ISO15765.h"
 #include <string.h>
 
-// MCU端发送至诊断设备的CAN ID
+// MCU端发送至诊断设备的CAN ID(ISO15765-3)
 #define ISOTP_TX_ID   0x7E8
 
 // 定义上下文对象
@@ -32,6 +32,7 @@ void ISOTP_Init(void)
     g_isotp.rx_count = 0;
     g_isotp.rx_total_len = 0;
     g_isotp.expected_sn = 0;
+    g_isotp.timer_ncr = 0;
 
     // 清空缓冲区
     memset(g_isotp.rx_buffer, 0, ISOTP_MAX_BUF_SIZE);
@@ -118,6 +119,8 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             
             // 切换状态：等待连续帧
             g_isotp.state = ISOTP_RX_WAIT_CF;
+
+            g_isotp.timer_ncr = ISOTP_TIMEOUT_NCR;
             
             // 发送流控帧 (FC)，告诉上位机可以开始发包
             ISOTP_Send_FC();
@@ -139,6 +142,8 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
                 g_isotp.state = ISOTP_RX_ERROR;
                 return;
             }
+
+            g_isotp.timer_ncr = ISOTP_TIMEOUT_NCR;
             
             // 计算本次要复制多少字节
             // 通常是 7 字节，但最后一帧可能少于 7 字节
@@ -193,4 +198,18 @@ uint16_t ISOTP_GetRxLength(void)
     return g_isotp.rx_total_len;
 }
 
+void ISOTP_Timer_NCr(void)
+{
+    if ((g_isotp.state == ISOTP_RX_WAIT_CF) && (TIM3_GetNCrFlag() == 1))
+    {
+        if (g_isotp.timer_ncr > 0)
+        {
+            g_isotp.timer_ncr = g_isotp.timer_ncr - 200;
+        }
 
+        if (g_isotp.timer_ncr <= 0)
+        {
+            g_isotp.state = ISOTP_RX_ERROR;
+        }
+    }
+}

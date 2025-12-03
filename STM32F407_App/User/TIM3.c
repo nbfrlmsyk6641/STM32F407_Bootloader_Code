@@ -2,9 +2,11 @@
 
 // 定时器计数变量
 static uint16_t Time_Count = 0;
+static uint16_t Time_NCr = 0;
 
 // 定时器计时任务标志位
 volatile uint8_t g_timer_1s_flag = 0;
+volatile uint8_t g_timer_NCr_flag = 0;
 
 // TIM3定时器配置函数
 void TIM3_Configuration(void)
@@ -50,6 +52,7 @@ void TIM3_IRQHandler(void)
     if (TIM_GetITStatus(TIM3, TIM_IT_Update) != RESET)
     {
         Time_Count ++;
+        Time_NCr ++;
 
         // 每2秒翻转一次LED，并发送一帧CAN报文
         if(Time_Count >= 20)
@@ -58,6 +61,13 @@ void TIM3_IRQHandler(void)
 
             // 设置标志位
             g_timer_1s_flag = 1;
+        }
+
+        if (Time_NCr >= 2)
+        {
+            Time_NCr = 0;
+
+            g_timer_NCr_flag = 1;
         }
 
         // 清除中断标志
@@ -75,4 +85,16 @@ uint8_t TIM3_GetTimeFlag(void)
 void TIM3_ClearTimeFlag(void)
 {
     g_timer_1s_flag = 0;
+}
+
+// 中断标志位接口函数
+uint8_t TIM3_GetNCrFlag(void)
+{
+    return g_timer_NCr_flag;
+}
+
+// 中断标志位清除函数
+void TIM3_ClearNCrFlag(void)
+{
+    g_timer_NCr_flag = 0;
 }

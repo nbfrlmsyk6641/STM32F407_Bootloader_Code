@@ -17,6 +17,9 @@
 // UDS单次传输最大数据块定义
 #define ISOTP_MAX_BUF_SIZE  4096
 
+// ISO-TP等待超时
+#define ISOTP_TIMEOUT_NCR   1000
+
 // 数据包传输状态机枚举
 typedef enum {
     ISOTP_IDLE,                       // 空闲状态，等待新消息
@@ -40,6 +43,9 @@ typedef struct {
     uint8_t  st_min;                        // 最小间隔时间 (建议 0-5ms)
     uint8_t  block_size;                    // 块大小 (0表示不分块)
 
+    // --- 网络层定时参数 ---
+    uint32_t  timer_ncr;
+
 } IsoTpLink_t;
 
 // 函数声明
@@ -50,6 +56,7 @@ uint8_t ISOTP_IsReceiveComplete(void);
 uint8_t ISOTP_IsError(void);
 uint8_t* ISOTP_GetRxBuffer(void);
 uint16_t ISOTP_GetRxLength(void);
+void ISOTP_Timer_NCr(void);
 
 #endif /* __ISO15765_H */
 
