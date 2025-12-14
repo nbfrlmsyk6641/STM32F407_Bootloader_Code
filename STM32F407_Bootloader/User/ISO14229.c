@@ -40,15 +40,15 @@ uint32_t j;
 // CRC校验变量
 uint32_t local_crc = 0;
 
-// UDS否定响应发送函数
-static void UDS_Send_NRC(uint8_t sid, uint8_t nrc)
-{
-    uint8_t resp[3];
-    resp[0] = 0x7F; // Negative Response
-    resp[1] = sid;  // Service ID
-    resp[2] = nrc;  // Error Code
-    ISOTP_Transmit_SF(0x7E8, resp, 3);
-}
+//// UDS否定响应发送函数
+//static void UDS_Send_NRC(uint8_t sid, uint8_t nrc)
+//{
+//    uint8_t resp[3];
+//    resp[0] = 0x7F; // Negative Response
+//    resp[1] = sid;  // Service ID
+//    resp[2] = nrc;  // Error Code
+//    ISOTP_Transmit_SF(0x7E8, resp, 3);
+//}
 
 // UDS协议初始化函数
 void UDS_Init(void)

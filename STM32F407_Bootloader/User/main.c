@@ -84,7 +84,7 @@ int main(void)
         {
 
             // LED闪烁，指示正在运行
-            // LED_Task();
+            LED_Task();
 
             // 传输层处理CAN报文
             ISO15765_CAN();
