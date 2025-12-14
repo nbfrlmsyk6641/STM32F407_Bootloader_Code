@@ -16,3 +16,12 @@ void LED_GPIO_Config(void)
 	LED1_OFF;
 }
 
+void LED_Task(void)
+{
+	if (Get_Task1_Flag() == 1)
+	{
+		Clear_Task1_Flag();
+		GPIO_ToggleBits(GPIOE, GPIO_Pin_13);
+	}
+}
+

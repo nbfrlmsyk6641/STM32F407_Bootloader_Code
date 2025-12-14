@@ -1,4 +1,4 @@
-#include "ISO15765.h"
+#include "main.h"
 #include <string.h>
 
 // 定义上下文对象
@@ -16,13 +16,19 @@ static void ISOTP_Send_FC(void)
     tx_data[0] = 0x30; 
     
     // Byte 1: BS (Block Size) = 0 (不分块，一次发完)
-    tx_data[1] = 0x00; 
+    tx_data[1] = g_isotp.block_size; 
     
     // Byte 2: STmin (最小间隔) = 5ms 
     tx_data[2] = 0x05; 
     
     // 发送报文
     CAN1_Transmit_TX(ISOTP_TX_ID, 8, tx_data);
+
+    // 发完FC清计数（因为发送一次FC就意味着要准备收下一轮数据）
+    g_isotp.bs_counter = 0;
+
+    // NCr重置
+    g_isotp.timer_n_cr = ISOTP_TIMEOUT_N_CR;
 }
 
 // 协议初始化函数
@@ -32,6 +38,8 @@ void ISOTP_Init(void)
     g_isotp.rx_count = 0;
     g_isotp.rx_total_len = 0;
     g_isotp.expected_sn = 0;
+    g_isotp.timer_n_cr = 0;
+    g_isotp.block_size = 16;
 
     // 清空缓冲区
     memset(g_isotp.rx_buffer, 0, ISOTP_MAX_BUF_SIZE);
@@ -118,9 +126,12 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             
             // 切换状态：等待连续帧
             g_isotp.state = ISOTP_RX_WAIT_CF;
+
+            g_isotp.timer_n_cr = ISOTP_TIMEOUT_N_CR;
             
             // 发送流控帧 (FC)，告诉上位机可以开始发包
             ISOTP_Send_FC();
+
             break;
 
         // ---------------------------------------------------------
@@ -139,6 +150,9 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
                 g_isotp.state = ISOTP_RX_ERROR;
                 return;
             }
+
+            // 获取到了连续帧，重置NCr
+            g_isotp.timer_n_cr = ISOTP_TIMEOUT_N_CR;
             
             // 计算本次要复制多少字节
             // 通常是 7 字节，但最后一帧可能少于 7 字节
@@ -154,6 +168,16 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             
             // 更新期望的下一个 SN (0-15 循环)
             g_isotp.expected_sn = (g_isotp.expected_sn + 1) % 16;
+
+            if (g_isotp.block_size > 0)
+            {
+                g_isotp.bs_counter ++;
+
+                if (g_isotp.bs_counter >= g_isotp.block_size)
+                {
+                    ISOTP_Send_FC();
+                }
+            }
             
             // 检查是否接收完毕
             if (g_isotp.rx_count >= g_isotp.rx_total_len)
@@ -164,5 +188,57 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             
         default:
             break;
+    }
+}
+
+// 状态接口函数
+// ISO-TP处理状态查询接口函数
+uint8_t ISOTP_IsReceiveComplete(void)
+{
+    return (g_isotp.state == ISOTP_RX_COMPLETE) ? 1 : 0;
+}
+
+// ISO-TP错误状态查询接口函数
+uint8_t ISOTP_IsError(void)
+{
+    return (g_isotp.state == ISOTP_RX_ERROR) ? 1 : 0;
+}
+
+// ISO-TP接收数据地址接口函数
+uint8_t* ISOTP_GetRxBuffer(void)
+{
+    return g_isotp.rx_buffer;
+}
+
+// ISO-TP接收数据长度接口函数
+uint16_t ISOTP_GetRxLength(void)
+{
+    return g_isotp.rx_total_len;
+}
+
+void ISOTP_Timer_NCr(void)
+{
+    if ((g_isotp.state == ISOTP_RX_WAIT_CF) && (TIM3_GetNCrFlag() == 1))
+    {
+        TIM3_ClearNCrFlag();
+
+        if (g_isotp.timer_n_cr > 0)
+        {
+            g_isotp.timer_n_cr -= 200;
+        }
+
+        if (g_isotp.timer_n_cr <= 0)
+        {
+            g_isotp.state = ISOTP_RX_ERROR;
+        }
+    }
+}
+
+void ISOTP_ErrorStatus(void)
+{
+    if (g_isotp.state == ISOTP_RX_ERROR)
+    {
+        LED1_ON;
+        ISOTP_Init();
     }
 }

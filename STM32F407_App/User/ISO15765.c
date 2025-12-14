@@ -39,6 +39,7 @@ void ISOTP_Init(void)
     g_isotp.rx_total_len = 0;
     g_isotp.expected_sn = 0;
     g_isotp.timer_ncr = 0;
+    g_isotp.block_size = 0;
 
     // 清空缓冲区
     memset(g_isotp.rx_buffer, 0, ISOTP_MAX_BUF_SIZE);
@@ -218,6 +219,8 @@ void ISOTP_Timer_NCr(void)
 {
     if ((g_isotp.state == ISOTP_RX_WAIT_CF) && (TIM3_GetNCrFlag() == 1))
     {
+        TIM3_ClearNCrFlag();        
+
         if (g_isotp.timer_ncr > 0)
         {
             g_isotp.timer_ncr = g_isotp.timer_ncr - 200;

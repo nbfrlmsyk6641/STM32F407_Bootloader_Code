@@ -18,7 +18,7 @@
 #define ISOTP_MAX_BUF_SIZE  4096
 
 // ISO-TP等待超时
-#define ISOTP_TIMEOUT_NCR   1000
+#define ISOTP_TIMEOUT_NCR   2000
 
 // 数据包传输状态机枚举
 typedef enum {
@@ -42,13 +42,10 @@ typedef struct {
     // --- 发送控制 (流控参数) ---
     uint8_t  st_min;                        // 最小间隔时间 (建议 0-5ms)
     uint8_t  block_size;                    // 块大小 (0表示不分块)
+	uint8_t  bs_counter;
 
     // --- 网络层定时参数 ---
     uint32_t  timer_ncr;
-
-    // --- 流控帧变量 ---
-    uint8_t  block_size;
-    uint8_t  bs_counter;
 
 } IsoTpLink_t;
 

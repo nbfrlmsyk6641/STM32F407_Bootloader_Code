@@ -10,6 +10,9 @@ static volatile uint16_t Task2_Flag = 0;
 static volatile uint16_t Time_Task3 = 0;
 static volatile uint16_t Task3_Flag = 0;
 
+static uint16_t Time_NCr = 0;
+volatile uint8_t g_timer_NCr_flag = 0;
+
 void TIM3_Configuration(void)
 {
     TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
@@ -56,6 +59,7 @@ void TIM3_IRQHandler(void)
         Time_Task1 ++;
         Time_Task2 ++;
         Time_Task3 ++;
+        Time_NCr ++;
 
         // 2 * 100ms = 200ms
         if(Time_Task1 >= 5)
@@ -76,6 +80,12 @@ void TIM3_IRQHandler(void)
         {
             Time_Task2 = 0;
             Task2_Flag = 1;
+        }
+
+        if (Time_NCr >= 2)
+        {
+            Time_NCr = 0;
+            g_timer_NCr_flag = 1;
         }
 
         // 清除中断标志
@@ -112,4 +122,16 @@ void Clear_Task2_Flag(void)
 void Clear_Task3_Flag(void)
 {
     Task3_Flag = 0;
+}
+
+// 中断标志位接口函数
+uint8_t TIM3_GetNCrFlag(void)
+{
+    return g_timer_NCr_flag;
+}
+
+// 中断标志位清除函数
+void TIM3_ClearNCrFlag(void)
+{
+    g_timer_NCr_flag = 0;
 }

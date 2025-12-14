@@ -488,6 +488,16 @@
               <FileType>5</FileType>
               <FilePath>.\User\ISO15765.h</FilePath>
             </File>
+            <File>
+              <FileName>ISO14229.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>.\User\ISO14229.c</FilePath>
+            </File>
+            <File>
+              <FileName>ISO14229.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>.\User\ISO14229.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
