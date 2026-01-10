@@ -6,7 +6,7 @@ void LED_GPIO_Config(void)
 
 	GPIO_InitTypeDef  GPIO_InitStructure;
 	/* Enable the GPIO_LED Clock */
-	RCC_AHB1PeriphClockCmd(  RCC_AHB1Periph_GPIOE, ENABLE); 		
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE); 		
 	
 	GPIO_InitStructure.GPIO_Pin = GPIO_Pin_13;
 	GPIO_InitStructure.GPIO_Mode = GPIO_Mode_OUT;

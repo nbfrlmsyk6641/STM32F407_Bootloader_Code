@@ -34,7 +34,7 @@ uint32_t IAP_Calculate_CRC_On_Flash(uint32_t start_address, uint32_t size_in_byt
     // 1. 确保CRC时钟是关闭的
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_CRC, DISABLE);
     
-    // 2. 将 Flash 地址 (一个指针) 和 大小 传递给软件CRC函数
+    // 2. 将 Flash 地址 (一个指针，传递指针后相当于得到数组名，按照操作数组的方式去读数据即可) 和 大小 传递给软件CRC函数
     return IAP_Software_Calculate_CRC((const uint8_t*)start_address, size_in_bytes);
 }
 

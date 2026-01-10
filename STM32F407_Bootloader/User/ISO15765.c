@@ -107,7 +107,7 @@ void ISOTP_Receive_Handler(CanRxMsg *msg)
             // 例如: 10 80 -> 0x080 = 128 字节
             g_isotp.rx_total_len = ((msg->Data[0] & 0x0F) << 8) | msg->Data[1];
             
-            // 保护：如果数据太大，超过了要开辟的 4KB RAM，必须报错
+            // 保护：超过了开辟的 4KB RAM，必须报错
             if (g_isotp.rx_total_len > ISOTP_MAX_BUF_SIZE)
             {
                 g_isotp.state = ISOTP_RX_ERROR;
